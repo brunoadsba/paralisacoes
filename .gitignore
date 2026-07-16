@@ -1,0 +1,28 @@
+# Segredos / configuração local
+.env
+.env.*
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Logs e evidências geradas em execução
+logs/
+screenshots/
+*.log
+
+# Relatórios executivos gerados pós-execução
+relatorios/
+
+# Estado runtime (contém IDs internos do OpenPort)
+data/status.json
+
+# Artefatos de ferramentas de qualidade
+.coverage
+.pytest_cache/
+.ruff_cache/

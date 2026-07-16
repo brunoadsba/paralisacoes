@@ -1,0 +1,18 @@
+# Normalizar line endings
+* text=auto
+
+# Python source
+*.py text diff=python
+*.pyw text
+
+# Markdown / docs
+*.md text
+*.toml text
+*.cfg text
+*.ini text
+
+# Binários — não converter
+*.png binary
+*.jpg binary
+*.xlsx binary
+*.pdf binary
