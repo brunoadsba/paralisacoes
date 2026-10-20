@@ -6,7 +6,7 @@ import openpyxl
 
 from paralisacao.config import Config
 from paralisacao.mapeamento import codigo_motivo, motivo_sistema, normalizar
-from paralisacao.resumo import ResumoEmbarque, ler_resumo
+from paralisacao.resumo import EventoResumo, ResumoEmbarque, ler_resumo
 
 logger = logging.getLogger("paralisacao.preparar")
 
@@ -108,6 +108,36 @@ def pendencias(linhas: list[LinhaPadrao], config: Config, programacao: str) -> l
         if not codigo:
             faltas.append(linha.motivo)
     return faltas
+
+
+def linhas_de_planilha(dados) -> list[LinhaPadrao]:
+    """Converte a planilha padrão já pronta nas linhas que o painel exibe."""
+    linhas: list[LinhaPadrao] = []
+    for capa in dados.capas:
+        for item in capa.paralisacoes:
+            linhas.append(
+                LinhaPadrao(
+                    registro=capa.registro,
+                    navio=capa.navio,
+                    data=capa.data,
+                    produto=capa.produto,
+                    periodo=capa.periodo,
+                    inicio=item.inicio,
+                    fim=item.fim,
+                    motivo=item.motivo,
+                )
+            )
+    return linhas
+
+
+def resumo_de_planilha(dados) -> ResumoEmbarque:
+    eventos = [
+        EventoResumo(capa.data, item.inicio, item.fim, item.motivo)
+        for capa in dados.capas
+        for item in capa.paralisacoes
+    ]
+    primeira = dados.capas[0]
+    return ResumoEmbarque(primeira.navio, primeira.produto, "", eventos)
 
 
 def dados_de_linhas(linhas: list[LinhaPadrao], programacao: str):

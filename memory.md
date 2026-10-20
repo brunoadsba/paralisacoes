@@ -1,6 +1,14 @@
 # Memória — RPA de paralisações OpenPort
 
-Atualizado em 20/10/2026. Branch de trabalho: `feat/preparar-resumo` (ainda sem commit desta etapa). Não gravar senha neste arquivo.
+Atualizado em 20/10/2026. Branch de trabalho: `fix/planilha-escolhida`. Não gravar senha neste arquivo.
+
+## Quem pede
+
+O usuário se chama Bruno e prefere ser chamado de Liara.
+
+## Onde está o projeto
+
+RPA de paralisações em `c:\Users\danyp\Downloads\paralisacoes`. Módulo `src/paralisacao`, com `pyproject.toml` e `requirements.txt`. Painel em `http://127.0.0.1:8080`.
 
 ## O que o sistema faz
 
@@ -11,13 +19,17 @@ Lê o resumo de embarque da Intermarítima, monta a planilha padrão do OpenPort
 - A Intermarítima entrega navio, produto, agência, data do bloco, início, fim e o texto do motivo. O usuário entrega a programação da viagem e o código numérico dos motivos que ainda não existem em `data/motivos.json`.
 - A data da capa é a data impressa no bloco `Paralisações - DD/MM/AA`, não a manhã seguinte do calendário.
 - O turno sai do horário de início. A função `_calcular_data_hora` só avança o dia quando a hora é menor que o início do período. Por isso 00:45 na capa 16/10 turno 19:00/01:00 continua nesse bloco; 01:00 fica na capa 01:00/07:00 da mesma data do bloco.
-- Não inventar código de motivo. Parecidos não são o mesmo motivo:
-  - TROCA DE TURNO não é 434 (TROCA TURNO - AGUARD. TPA) nem 435 (TROCA TURNO - AGUARD.OPERADORA).
-  - MANUTENÇÃO SPREADER não é 458 (MANUTENÇÃO CODEBA).
-  - DRAFT SURVEY não está na lista extraída em 13/07/2026 (`data/tipo-paralizacoes.md`).
+- Não inventar um código fora da lista oficial. Se o texto do resumo não existir nela, usar o item mais próximo e gravar o texto original na observação (`Resumo: ...`).
+  - TROCA DE TURNO → 435 TROCA TURNO - AGUARD.OPERADORA. A Intermarítima é a operadora. 434 é espera da TPA.
+  - DRAFT SURVEY → 460 VISTORIA. 299 seria espera do arqueador, não a vistoria em si.
+  - MANUTENÇÃO SPREADER → 453 INTERDIÇÃO DO EQUIPAMENTO. 458 é manutenção da CODEBA.
 - DDS mapeia para CONVENIENCIA DO USUARIO, código 34. CHUVA é código 5.
 - O lote só libera depois da primeira paralisação gravada com sucesso (`STATE["uma_ok"]`).
 - A interface reaproveita a casca visual da Automação SEV (`rpa-intermaritima`). Não copiar NF-e, PR, 9401 nem o CNPJ solicitante da SEV.
+
+## Automação SEV (referência, não é o produto a empacotar)
+
+Repositório clonado em `c:\Users\danyp\Downloads\rpa-intermaritima` (`https://github.com/brunoadsba/rpa-intermaritima.git`, branch `main`, v1.1.0). Stack: Flask, Playwright, openpyxl, PyYAML, keyring, cryptography, Pillow e pytest. O executável sai pelo PyInstaller em `build.bat` e `build_producao.bat`. A senha fica no cofre do Windows, serviço `rpa-sev-intermaritima`. OpenPort de teste: `https://ilheus.codeba.gov.br/qas/openportcodeba/default.aspx`. Produção, em `config.producao.ini`: `https://openportilheus.codeba.gov.br/openportcodeba/default.aspx`. Navegador Edge visível. Fluxo: login, tela 9401, Novo, gravar, enviar documento de carga.
 
 ## Viagem de teste — TI SUNRISE
 
@@ -27,9 +39,7 @@ Aba certa: **Resumo**. Motivo na coluna cujo cabeçalho contém "Motivo". A colu
 
 Doze paralisações em cinco capas (16/10 e 17/10/2026). Motivos do resumo: DDS, CHUVA, TROCA DE TURNO, DRAFT SURVEY, MANUTENÇÃO SPREADER.
 
-Programação digitada na tela e ainda não necessariamente gravada: **1772**. Os três motivos sem código continuam pendentes. A primeira linha (DDS 13:00–13:15, capa 16/10, turno 13:00/19:00) já tem código e pode ser a prova de uma gravação no QAS.
-
-A gravação ao vivo no QAS ainda não foi feita.
+Programação digitada na tela e ainda não necessariamente gravada: **1772**. Os três motivos do resumo que não estão na lista oficial já têm aproximação em `data/motivos.json`. A gravação ao vivo no QAS ainda não foi feita.
 
 ## URLs
 
@@ -38,11 +48,15 @@ A base usada pelo robô não leva `default.aspx`, porque `capa.py` concatena `ca
 - QAS e produção simulada: `https://ilheus.codeba.gov.br/qas/openportcodeba/`
 - Produção: `https://openportilheus.codeba.gov.br/openportcodeba/`
 
+Teste desta máquina em 20/10/2026: `https://openportilheus.codeba.gov.br/openportcodeba/` e `.../default.aspx` passaram de 30 s sem código HTTP. O servidor aceita a conexão, mas a página não responde. O navegador do Bruno abre o site normalmente.
+
 ## Painel
 
 `python -m paralisacao painel` sobe Flask em `127.0.0.1:8080` com `use_reloader=False`. Mudança de Python exige reinício. Reiniciar zera o estado em memória: login, resumo carregado e programação digitada e não enviada.
 
-Etapas: Acesso, Resumo, Pendências, Execução, Resultado. O upload vai para `data/operacoes/resumo_recebido.xlsx` (pasta no `.gitignore`). A planilha padrão só é gravada quando não há pendência.
+Dois cliques no executável também abrem esse painel. Não há planilha padrão embutida. Na etapa Planilha o usuário escolhe um arquivo `.xlsx` ou uma pasta com um único `.xlsx`. O painel lê o resumo da Intermarítima ou a planilha padrão. Na linha de comando o caminho vai em `--planilha`.
+
+Etapas: Acesso, Resumo, Pendências, Execução, Resultado. O arquivo escolhido fica em `data/operacoes/` (pasta no `.gitignore`). A planilha padrão gerada só é gravada quando não há pendência. O modo padrão do código é produção. O teste de 20/10/2026 foi feito no QAS.
 
 Cada campo de Pendências tem um botão **i** (`ajuda-flag`) explicando o que preencher. O código informado é salvo em `data/motivos.json` (`mapeamentos` e `codigos`) e não é pedido de novo.
 
@@ -61,6 +75,16 @@ Credenciais ficam no keyring do serviço `rpa-sev-intermaritima`. Nunca imprimir
 A faixa "sinalizador de linha de comando não suportado: `--disable-blink-features=AutomationControlled`" é aviso do Chrome. O Playwright liga essa opção ao abrir o navegador. Fechar a faixa não interrompe a gravação.
 
 O Playwright está instalado no Python 3.12. O `python` padrão desta máquina é o Anaconda 3.13, que sobe o painel, mas a execução do navegador falha até o Playwright existir nesse interpretador. Não repetir `pip install --target` da 3.12 para a Anaconda: o comando também alterou pacotes da 3.12.
+
+O empacotamento usa o `.venv` do projeto (Python 3.12) e o Playwright 1.49.1. O Chromium dessa versão é o **1148**. A pasta `chromium-1234` que sobrou na máquina não serve: o spec precisa cravar `chromium-1148`.
+
+## Executável
+
+Gerado em `c:\Users\danyp\Downloads\paralisacoes\dist\Paralisacoes\Paralisacoes.exe`. A pasta `dist` não entra no Git. O Chromium embutido é o **1148**. Uma montagem anterior tinha pego o 1234 e foi corrigida. O pacote que viaja para o computador do trabalho é a pasta `dist\Paralisacoes` inteira, não o exe sozinho. Não é preciso colocar uma pasta `data` ao lado do executável.
+
+A planilha de teste do repositório é `data/planilha padrão.xlsx` (antes `data/Paralisacoes_YANGTZE_QUANTUM.xlsx`). O navio dentro dela continua YANGTZE QUANTUM, programação 1766.
+
+Teste do painel pelo executável, em 20/10/2026, no QAS: a planilha foi lida, o resumo mostrou 7 capas e 16 paralisações, as pendências não pediram código e a execução listou as 16 na fila. **Gravar a primeira** não foi acionado. A tela Resultado ficou em "Nenhuma rodada concluída ainda". A gravação ao vivo no OpenPort continua pendente.
 
 Flags da CLI colocadas antes do subcomando `executar` são ignoradas. O dry-run válido é `python -m paralisacao executar --dry-run`.
 

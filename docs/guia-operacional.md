@@ -23,7 +23,7 @@ A planilha de entrada deve ser inserida na pasta `data/` e seguir a estrutura ab
 
 ### Dados do Exemplo Padrão
 * **Navio:** YANGTZE QUANTUM (Programação: 1766)
-* **Arquivo padrão:** `data/Paralisacoes_YANGTZE_QUANTUM.xlsx`
+* **Arquivo padrão:** `data/planilha padrão.xlsx`
 * **Turnos e correspondência:**
   * `01:00/07:00` → Turno 1 (01:00 - 07:00)
   * `07:00/13:00` → Turno 2 (07:00 - 13:00)

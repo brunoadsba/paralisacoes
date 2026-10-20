@@ -121,6 +121,52 @@ def test_codigo_novo_entra_no_json(tmp_path):
         mapeamento._CODIGOS_MOTIVO_CACHE = anterior
 
 
+def test_form_pede_arquivo_ou_pasta(client):
+    texto = client.get("/resumo").get_data(as_text=True)
+    assert 'name="resumo"' in texto
+    assert 'name="pasta"' in texto
+    assert "YANGTZE_QUANTUM" not in texto
+
+
+def test_sem_arquivo_pede_selecao(client):
+    texto = client.post("/resumo", data={}).get_data(as_text=True)
+    assert "Selecione a planilha" in texto
+
+
+def test_pasta_com_uma_planilha_no_painel(client, tmp_path):
+    caminho = tmp_path / "resumo.xlsx"
+    _resumo(caminho)
+    with caminho.open("rb") as arquivo:
+        resposta = client.post(
+            "/resumo",
+            data={"pasta": (arquivo, "operacao/resumo.xlsx")},
+            content_type="multipart/form-data",
+            follow_redirects=True,
+        )
+    assert "TI SUNRISE" in resposta.get_data(as_text=True)
+
+
+def test_planilha_padrao_no_painel(client, tmp_path):
+    caminho = tmp_path / "padrao.xlsx"
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(["Programa do Navio", "1766"])
+    ws.append(["Registro", "Navio", "Data", "Produto", "Período", "Início", "Fim", "Motivo"])
+    ws.append(["1", "YANGTZE QUANTUM", "09/07/2026", "Milho", "13:00/19:00", "13:00", "13:15", "DDS"])
+    wb.save(caminho)
+    with caminho.open("rb") as arquivo:
+        resposta = client.post(
+            "/resumo",
+            data={"resumo": (arquivo, "padrao.xlsx")},
+            content_type="multipart/form-data",
+            follow_redirects=True,
+        )
+    texto = resposta.get_data(as_text=True)
+    assert "YANGTZE QUANTUM" in texto
+    with LOCK:
+        assert STATE["programacao"] == "1766"
+
+
 def test_resumo_minimo_no_painel(client, tmp_path):
     caminho = tmp_path / "resumo.xlsx"
     _resumo(caminho)

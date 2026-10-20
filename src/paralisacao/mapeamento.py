@@ -32,7 +32,10 @@ def motivo_sistema(motivo: str, config: Config) -> str | None:
     if arquivo_motivos.exists():
         try:
             dados_motivos = json.loads(arquivo_motivos.read_text(encoding="utf-8"))
-            mapeamentos = dados_motivos.get("mapeamentos", {})
+            mapeamentos = {
+                normalizar(chave): valor
+                for chave, valor in dados_motivos.get("mapeamentos", {}).items()
+            }
             normalized_motivo = normalizar(motivo)
             if normalized_motivo in mapeamentos:
                 return mapeamentos[normalized_motivo]
@@ -54,7 +57,7 @@ def _carregar_codigos_motivo(config: Config) -> dict[str, int]:
         for linha in conteudo.splitlines():
             m = re.match(r"^\|\s*\d+\s*\|\s*(\d+)\s*\|\s*(.+?)\s*\|", linha)
             if m:
-                codigos[m.group(2).strip().upper()] = int(m.group(1))
+                codigos[normalizar(m.group(2))] = int(m.group(1))
     except Exception as e:
         logger.error(f"Erro ao carregar codigos de motivo: {e}")
     return codigos
@@ -87,6 +90,13 @@ def codigo_motivo(nome_sistema: str, config: Config) -> int | None:
     if chave in extra:
         return extra[chave]
     return _CODIGOS_MOTIVO_CACHE.get(chave)
+
+
+def texto_observacao(motivo_resumo: str, nome_sistema: str) -> str:
+    """Quando o código é aproximado, a observação guarda o texto do resumo."""
+    if normalizar(motivo_resumo) == normalizar(nome_sistema):
+        return motivo_resumo
+    return f"Resumo: {motivo_resumo}"
 
 
 def salvar_codigo_motivo(config: Config, motivo_planilha: str, codigo: int) -> None:

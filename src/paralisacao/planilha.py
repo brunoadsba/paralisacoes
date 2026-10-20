@@ -113,6 +113,9 @@ if __name__ == "__main__":
     from paralisacao import config
 
     caminho = sys.argv[1] if len(sys.argv) > 1 else config.PLANILHA
+    if not caminho:
+        print("Informe o arquivo ou a pasta: python -m paralisacao.planilha CAMINHO")
+        raise SystemExit(1)
     dados = ler_planilha(caminho)
     print(f"Programação do navio: {dados.prog_navio}")
     print(f"Total de capas: {len(dados.capas)}\n")

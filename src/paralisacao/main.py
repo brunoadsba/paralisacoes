@@ -6,6 +6,7 @@ from pathlib import Path
 
 from paralisacao import mapeamento
 from paralisacao.config import Config
+from paralisacao.entrada import deve_abrir_painel, resolver_entrada
 from paralisacao.planilha import DadosPlanilha, ler_planilha
 from paralisacao.preparar import executar_preparar
 from paralisacao.relatorio import Relatorio, obter_proxima_rodada
@@ -181,14 +182,14 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="RPA de Paralisações — OpenPort CODEBA")
 
     # Parâmetros globais para compatibilidade retroativa
-    parser.add_argument("--planilha", default=None, help="Caminho da planilha .xlsx")
+    parser.add_argument("--planilha", default=None, help="Arquivo .xlsx ou pasta com a planilha")
     parser.add_argument("--dry-run", action="store_true", help="Apenas lê a planilha e exibe o plano (sem automatizar)")
 
     subparsers = parser.add_subparsers(dest="comando", help="Subcomandos opcionais")
 
     # Subcomando executar
     exec_parser = subparsers.add_parser("executar", help="Executa a automação completa")
-    exec_parser.add_argument("--planilha", default=None, help="Caminho da planilha .xlsx")
+    exec_parser.add_argument("--planilha", default=None, help="Arquivo .xlsx ou pasta com a planilha")
     exec_parser.add_argument("--dry-run", action="store_true", help="Apenas lê a planilha e exibe o plano")
 
     # Subcomando status
@@ -196,7 +197,7 @@ def main() -> int:
 
     # Subcomando validar
     validar_parser = subparsers.add_parser("validar", help="Apenas valida a planilha de entrada")
-    validar_parser.add_argument("planilha_caminho", nargs="?", default=None, help="Caminho da planilha .xlsx")
+    validar_parser.add_argument("planilha_caminho", nargs="?", default=None, help="Arquivo .xlsx ou pasta com a planilha")
 
     preparar_parser = subparsers.add_parser("preparar", help="Gera a planilha padrão a partir do resumo de embarque")
     preparar_parser.add_argument("resumo", help="Caminho do resumo de embarque .xlsx")
@@ -222,7 +223,7 @@ def main() -> int:
         is_dry_run = True
     elif comando == "preparar":
         return executar_preparar(args.resumo, args.saida, args.programacao or "", args.operador, config)
-    elif comando == "painel":
+    elif comando == "painel" or deve_abrir_painel(comando, args.planilha, args.dry_run):
         from paralisacao.ui.app import main as painel_main
 
         return painel_main()
@@ -241,9 +242,17 @@ def main() -> int:
                 logger.info(f"  - {p.get('inicio')} -> {p.get('fim')} | {p.get('motivo_planilha')}: {p.get('status').upper()}")
         return 0
 
-    # Fluxo principal (executar / validar / compatibilidade)
-    if not Path(planilha_alvo).exists():
-        logger.error(f"Planilha nao encontrada: {planilha_alvo}")
+    # Fluxo principal (executar / validar / compatibilidade). Sem arquivo padrão.
+    if not planilha_alvo:
+        logger.error(
+            "Informe o arquivo ou a pasta com --planilha. "
+            "Sem argumento, abra o painel: python -m paralisacao painel"
+        )
+        return 1
+    try:
+        planilha_alvo = str(resolver_entrada(planilha_alvo, config.project_root))
+    except ValueError as exc:
+        logger.error(str(exc))
         return 1
 
     dados = ler_planilha(planilha_alvo)

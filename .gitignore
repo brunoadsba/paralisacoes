@@ -23,6 +23,10 @@ relatorios/
 data/status.json
 data/operacoes/
 
+# Empacotamento PyInstaller
+build/
+dist/
+
 # Artefatos de ferramentas de qualidade
 .coverage
 .pytest_cache/

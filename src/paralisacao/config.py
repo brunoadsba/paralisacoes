@@ -1,4 +1,5 @@
 import os
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -26,12 +27,16 @@ class Config:
 
     @classmethod
     def from_env(cls, dotenv_path: str | None = None) -> "Config":
+        if getattr(sys, "frozen", False):
+            project_root = Path(getattr(sys, "_MEIPASS"))
+            load_dotenv(Path(sys.executable).resolve().parent / ".env")
+        else:
+            project_root = Path(__file__).resolve().parent.parent.parent
+            load_dotenv(project_root / ".env")
         load_dotenv(dotenv_path)
 
         primeiro_plano = os.getenv("PRIMEIRO_PLANO", "true").strip().lower() in ("1", "true", "yes", "sim")
         headless = os.getenv("HEADLESS", "false").strip().lower() in ("1", "true", "yes", "sim")
-
-        project_root = Path(__file__).resolve().parent.parent.parent
 
         css = {
             # Login
@@ -88,7 +93,7 @@ class Config:
             url=os.getenv("OPENPORT_URL", "https://openportilheus.codeba.gov.br/openportcodeba/"),
             login=os.getenv("OPENPORT_LOGIN", ""),
             senha=os.getenv("OPENPORT_SENHA", ""),
-            planilha=os.getenv("PLANILHA", "data/Paralisacoes_YANGTZE_QUANTUM.xlsx"),
+            planilha=os.getenv("PLANILHA", ""),
             headless=headless,
             primeiro_plano=primeiro_plano,
             timeout_ms=int(os.getenv("TIMEOUT_MS", "30000")),

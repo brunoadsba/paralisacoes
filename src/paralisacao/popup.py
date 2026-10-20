@@ -264,9 +264,12 @@ def adicionar_paralisacao(page: Page, config: Config, relatorio: Relatorio,
         preencher_data_hora(popup, config, config.css["popup_data_fim"],
                              config.css["popup_hora_fim"], valor_fim)
 
-        # 6. Observacao = motivo ORIGINAL da planilha
+        # 6. Observação guarda o texto do resumo quando o código é aproximado
         if p.motivo and config.css.get("popup_observacao"):
-            browser.preencher(popup, config, config.css["popup_observacao"], p.motivo)
+            browser.preencher(
+                popup, config, config.css["popup_observacao"],
+                mapeamento.texto_observacao(p.motivo, nome_sistema),
+            )
 
         browser.esperar(popup, 1500)
 

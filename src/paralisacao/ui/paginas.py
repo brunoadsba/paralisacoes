@@ -59,13 +59,15 @@ def form_login(cred: dict, modo: str) -> str:
 def form_resumo(aviso: str = "") -> str:
     bloco = f'<p class="aviso-err mb-3">{html.escape(aviso)}</p>' if aviso else ""
     return f"""<div class="py-2" style="max-width:640px">
-  <h1 class="titulo-pagina">Resumo de embarque</h1>
-  <p class="mutedx mb-3">Arquivo enviado pela Intermarítima. O painel lê navio, produto, horários e motivos.</p>
+  <h1 class="titulo-pagina">Planilha</h1>
+  <p class="mutedx mb-3">Escolha o arquivo .xlsx ou a pasta em que ele está. O programa não procura um caminho fixo.</p>
   {bloco}
   <form method="post" enctype="multipart/form-data" class="cardx p-4">
-    <label class="form-label" for="resumo">Planilha .xlsx</label>
-    <input id="resumo" class="form-control mb-3" type="file" name="resumo" accept=".xlsx" required>
-    <button class="btn btn-brand" type="submit">Ler resumo</button>
+    <label class="form-label" for="resumo">Arquivo</label>
+    <input id="resumo" class="form-control mb-3" type="file" name="resumo" accept=".xlsx,.xlsm">
+    <label class="form-label" for="pasta">Pasta</label>
+    <input id="pasta" class="form-control mb-3" type="file" name="pasta" webkitdirectory directory multiple>
+    <button class="btn btn-brand" type="submit">Ler planilha</button>
   </form>
 </div>"""
 
@@ -75,33 +77,10 @@ def painel_resumo(navio: str, agencia: str, produto: str, capas: int, total: int
   <h1 class="titulo-pagina">{html.escape(navio)}</h1>
   <p class="mb-3">{html.escape(agencia)} · {html.escape(produto)} · {capas} capas · {total} paralisações</p>
   <div class="cardx mb-3"><table class="tbl"><thead><tr>
-    <th>Capa</th><th>Data</th><th>Turno</th><th>Horário</th><th>Motivo</th>
+    <th>Capa</th><th>Data</th><th>Turno</th><th>Horário</th><th>Motivo</th><th>No OpenPort</th>
   </tr></thead><tbody>{linhas_html}</tbody></table></div>
   <a class="btn btn-brand" href="/pendencias">Continuar</a>
 </div>"""
-
-
-_AJUDA_MOTIVO = {
-    "TROCA DE TURNO": (
-        "Texto do resumo da Intermarítima. O campo pede o código numérico desse tipo "
-        "no lookup de paralisação do OpenPort. A lista extraída em 13/07/2026 não tem "
-        "esse nome exato. Os parecidos são 434 (TROCA TURNO - AGUARD. TPA) e 435 "
-        "(TROCA TURNO - AGUARD.OPERADORA). Confira na tela antes de gravar. "
-        "O número fica em motivos.json e não será pedido de novo."
-    ),
-    "DRAFT SURVEY": (
-        "Texto do resumo da Intermarítima para a paralisação de draft survey. "
-        "Digite o código numérico correspondente no lookup de tipo de paralisação "
-        "do OpenPort. Esse nome não está na lista extraída em 13/07/2026. "
-        "O número fica salvo e não será pedido de novo."
-    ),
-    "MANUTENÇÃO SPREADER": (
-        "Texto do resumo da Intermarítima para a paralisação de manutenção do spreader. "
-        "Digite o código numérico desse tipo no lookup do OpenPort. "
-        "Não é o mesmo que 458 (MANUTENÇÃO CODEBA). "
-        "O número fica salvo e não será pedido de novo."
-    ),
-}
 
 
 def _flag(identificador: str, texto: str) -> tuple[str, str]:
@@ -131,9 +110,9 @@ def form_pendencias(programacao: str, motivos: list[str], aviso: str = "") -> st
         f'value="{html.escape(programacao)}" required>',
     ]
     for indice, motivo in enumerate(motivos):
-        texto = _AJUDA_MOTIVO.get(motivo) or (
-            "Motivo escrito no resumo da Intermarítima que ainda não tem código no OpenPort. "
-            "Digite o número do lookup de tipo de paralisação. Ele fica salvo para a próxima viagem."
+        texto = (
+            "Este texto não está na lista do OpenPort. Digite o código mais próximo. "
+            "O texto original do resumo vai para o campo observação."
         )
         botao, explicacao = _flag(f"ajuda-cod{indice}", texto)
         campos.append(

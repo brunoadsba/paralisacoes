@@ -1,7 +1,7 @@
 import pytest
 
 from paralisacao.config import Config
-from paralisacao.mapeamento import codigo_motivo, motivo_sistema, normalizar, turno_do_periodo
+from paralisacao.mapeamento import codigo_motivo, motivo_sistema, normalizar, texto_observacao, turno_do_periodo
 
 
 @pytest.fixture
@@ -46,6 +46,14 @@ class TestMotivoSistema:
     def test_case_insensitive(self, config):
         assert motivo_sistema("chuva", config) == "CHUVA"
 
+    def test_aproximacao_grava_texto_na_observacao(self, config):
+        assert motivo_sistema("TROCA DE TURNO", config) == "TROCA TURNO - AGUARD.OPERADORA"
+        assert codigo_motivo("TROCA TURNO - AGUARD.OPERADORA", config) == 435
+        assert motivo_sistema("DRAFT SURVEY", config) == "VISTORIA"
+        assert codigo_motivo("VISTORIA", config) == 460
+        assert motivo_sistema("MANUTENÇÃO SPREADER", config) == "INTERDIÇÃO DO EQUIPAMENTO"
+        assert codigo_motivo("INTERDIÇÃO DO EQUIPAMENTO", config) == 453
+
     def test_motivo_desconhecido(self, config):
         assert motivo_sistema("MOTIVO_INEXISTENTE", config) is None
 
@@ -57,3 +65,7 @@ class TestCodigoMotivo:
 
     def test_codigo_invalido(self, config):
         assert codigo_motivo("CODIGO_INEXISTENTE", config) is None
+
+    def test_observacao_so_quando_aproxima(self):
+        assert texto_observacao("CHUVA", "CHUVA") == "CHUVA"
+        assert texto_observacao("TROCA DE TURNO", "TROCA TURNO - AGUARD.OPERADORA") == "Resumo: TROCA DE TURNO"

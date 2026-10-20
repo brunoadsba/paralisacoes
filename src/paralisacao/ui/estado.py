@@ -4,7 +4,7 @@ import threading
 STATE = {
     "usuario": "",
     "senha": "",
-    "modo": "qas",
+    "modo": "producao",
     "resumo": None,
     "linhas": [],
     "programacao": "",
