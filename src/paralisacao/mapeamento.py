@@ -59,9 +59,45 @@ def _carregar_codigos_motivo(config: Config) -> dict[str, int]:
         logger.error(f"Erro ao carregar codigos de motivo: {e}")
     return codigos
 
+def _codigos_json(config: Config) -> dict[str, int]:
+    arquivo = config.project_root / "data" / "motivos.json"
+    if not arquivo.exists():
+        return {}
+    try:
+        dados = json.loads(arquivo.read_text(encoding="utf-8"))
+    except Exception as e:
+        logger.error(f"Erro ao ler codigos de motivos.json: {e}")
+        return {}
+    codigos = {}
+    for nome, codigo in dados.get("codigos", {}).items():
+        try:
+            codigos[normalizar(nome)] = int(codigo)
+        except (TypeError, ValueError):
+            continue
+    return codigos
+
+
 def codigo_motivo(nome_sistema: str, config: Config) -> int | None:
     """Retorna o codigo numerico do motivo a partir do nome no sistema."""
     global _CODIGOS_MOTIVO_CACHE
     if _CODIGOS_MOTIVO_CACHE is None:
         _CODIGOS_MOTIVO_CACHE = _carregar_codigos_motivo(config)
-    return _CODIGOS_MOTIVO_CACHE.get(nome_sistema.strip().upper())
+    chave = normalizar(nome_sistema)
+    extra = _codigos_json(config)
+    if chave in extra:
+        return extra[chave]
+    return _CODIGOS_MOTIVO_CACHE.get(chave)
+
+
+def salvar_codigo_motivo(config: Config, motivo_planilha: str, codigo: int) -> None:
+    """Grava o código informado uma vez. A viagem seguinte reutiliza motivos.json."""
+    arquivo = config.project_root / "data" / "motivos.json"
+    dados = {"mapeamentos": {}, "codigos": {}}
+    if arquivo.exists():
+        dados.update(json.loads(arquivo.read_text(encoding="utf-8")))
+    dados.setdefault("mapeamentos", {})
+    dados.setdefault("codigos", {})
+    chave = normalizar(motivo_planilha)
+    dados["mapeamentos"][chave] = chave
+    dados["codigos"][chave] = int(codigo)
+    arquivo.write_text(json.dumps(dados, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

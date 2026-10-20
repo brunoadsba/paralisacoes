@@ -4,11 +4,10 @@ import sys
 import time
 from pathlib import Path
 
-from playwright.sync_api import sync_playwright
-
-from paralisacao import browser, capa, mapeamento, navegacao, popup, status
+from paralisacao import mapeamento
 from paralisacao.config import Config
 from paralisacao.planilha import DadosPlanilha, ler_planilha
+from paralisacao.preparar import executar_preparar
 from paralisacao.relatorio import Relatorio, obter_proxima_rodada
 
 # Configuração básica do logging para fallback/desenvolvimento
@@ -35,6 +34,9 @@ def mostrar_plano(dados: DadosPlanilha, config: Config) -> None:
 
 def executar(dados: DadosPlanilha, config: Config, relatorio: Relatorio, status_file: Path, planilha_path: str = "") -> None:
     """Orquestra a execução completa do RPA pelo Playwright."""
+    from playwright.sync_api import sync_playwright
+
+    from paralisacao import browser, capa, navegacao, popup, status
     prog_navio = dados.prog_navio or ""
     if not prog_navio:
         logger.warning("!! Programacao do navio nao encontrada na planilha.")
@@ -196,6 +198,14 @@ def main() -> int:
     validar_parser = subparsers.add_parser("validar", help="Apenas valida a planilha de entrada")
     validar_parser.add_argument("planilha_caminho", nargs="?", default=None, help="Caminho da planilha .xlsx")
 
+    preparar_parser = subparsers.add_parser("preparar", help="Gera a planilha padrão a partir do resumo de embarque")
+    preparar_parser.add_argument("resumo", help="Caminho do resumo de embarque .xlsx")
+    preparar_parser.add_argument("--programacao", default="", help="Número da programação do navio no OpenPort")
+    preparar_parser.add_argument("--operador", default="30002", help="Código do operador no OpenPort")
+    preparar_parser.add_argument("--saida", default=None, help="Caminho do arquivo padrão gerado")
+
+    subparsers.add_parser("painel", help="Abre o painel local em http://127.0.0.1:8080")
+
     args = parser.parse_args()
     config = Config.from_env()
 
@@ -210,7 +220,15 @@ def main() -> int:
     elif comando == "validar":
         planilha_alvo = args.planilha_caminho or planilha_alvo
         is_dry_run = True
+    elif comando == "preparar":
+        return executar_preparar(args.resumo, args.saida, args.programacao or "", args.operador, config)
+    elif comando == "painel":
+        from paralisacao.ui.app import main as painel_main
+
+        return painel_main()
     elif comando == "status":
+        from paralisacao import status
+
         status_file = config.project_root / "data" / "status.json"
         status_dict = status.carregar_status(status_file)
         logger.info(f"=== Status da Automação ({status_file.name}) ===")

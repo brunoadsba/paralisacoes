@@ -94,13 +94,16 @@ def criar_capa(page: Page, config: Config, capa: Capa, prog_navio: str) -> int |
     # Gravar via MySubmit (type="button", onclick="MySubmit(...)")
     logger.info("   Gravando nova capa...")
     page.evaluate("MySubmit('salvar', 'cadastro.aspx?WCI=frmEdtTurmaTrabVeiculos_007&Mv=Salvar')")
-    browser.esperar(page, 3000)
-    with contextlib.suppress(Exception):
-        page.wait_for_load_state("networkidle", timeout=8000)
-    browser.esperar(page, 2000)
-
-    # Extrair codRegistro da nova capa (input[name=codRegistro] sem id no DOM)
-    cod_registro = page.evaluate("document.querySelector('input[name=codRegistro]')?.value || ''")
+    try:
+        browser.esperar(page, 3000)
+        with contextlib.suppress(Exception):
+            page.wait_for_load_state("networkidle", timeout=8000)
+        browser.esperar(page, 2000)
+        cod_registro = page.evaluate("document.querySelector('input[name=codRegistro]')?.value || ''")
+    except Exception:
+        logger.warning("   Capa pode ter sido gravada. Nova tentativa não abrirá outro Mv=Novo.")
+        browser.salvar_screenshot(page, config, f"criar_capa_sem_codigo_{capa.registro}")
+        return None
     cod_registro = int(cod_registro) if cod_registro and str(cod_registro).isdigit() else 0
     if cod_registro:
         logger.info(f"   Capa criada: codRegistro={cod_registro}")

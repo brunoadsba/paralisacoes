@@ -13,6 +13,24 @@ from paralisacao.retry import com_retry
 
 logger = logging.getLogger("paralisacao.popup")
 
+def _atualizar_grade(page: Page) -> None:
+    """#REFRESH é o ID estável da toolbar. O xpath posicional fica só como reserva."""
+    for seletor in ("#REFRESH", "xpath=/html/body/div[3]/div[1]/button[3]"):
+        try:
+            local = page.locator(seletor)
+            if local.count() == 0:
+                continue
+            local.first.evaluate("el => el.click()")
+            with contextlib.suppress(Exception):
+                page.wait_for_load_state("networkidle")
+            browser.esperar(page, 1500)
+            logger.info("     Tela atualizada.")
+            return
+        except Exception as exc:
+            logger.warning(f"     (aviso: atualizar {seletor}: {exc})")
+    logger.warning("     (aviso: botão Atualizar não encontrado)")
+
+
 def abrir_popup_paralisacao(page: Page, config: Config, cod_registro: int) -> Page | None:
     """Abre o popup dlgEdtInformParalisManual via botao ⊕ e retorna a pagina do popup."""
     logger.info("   Abrindo popup de paralisacao (botao [+])...")
@@ -161,15 +179,14 @@ def preencher_data_hora(popup: Page, config: Config, seletor_data: str, seletor_
         browser.preencher(popup, config, seletor_hora, partes[0])
 
 def _verificar_gravacao(popup: Page) -> bool:
-    """Verifica se a gravação foi confirmada pelo OpenPort, levantando exceções em caso de falha."""
+    """Confirma a gravação só com texto de sucesso. Popup fechado ou silêncio é erro."""
     if popup.is_closed():
-        return True  # Popup fechou = salvou com sucesso
+        raise GravacaoError("Popup fechou sem mensagem de sucesso.")
 
     try:
-        # Aguarda um curto timeout para ler o corpo caso o sistema demore a renderizar o erro/sucesso
         body = popup.locator("body").inner_text(timeout=3000)
-    except Exception:
-        return False
+    except Exception as exc:
+        raise GravacaoError("Não foi possível ler a confirmação da gravação.") from exc
 
     body_lower = body.lower()
 
@@ -221,11 +238,12 @@ def adicionar_paralisacao(page: Page, config: Config, relatorio: Relatorio,
         if codigo:
             logger.info(f"     Preenchendo motivo codigo={codigo} ({nome_sistema})")
             campo_motivo = popup.locator(config.css["popup_motivo"])
-            campo_motivo.click()
-            browser.esperar(popup, 200)
-            campo_motivo.fill(str(codigo))
-            browser.esperar(popup, 300)
-            campo_motivo.press("Tab")
+            with browser.entrada_do_robo(popup):
+                campo_motivo.click()
+                browser.esperar(popup, 200)
+                campo_motivo.fill(str(codigo))
+                browser.esperar(popup, 300)
+                campo_motivo.press("Tab")
             browser.esperar(popup, 1500)
         else:
             logger.info(f"     !! Codigo nao encontrado para '{nome_sistema}'. Tentando lookup...")
@@ -274,17 +292,16 @@ def adicionar_paralisacao(page: Page, config: Config, relatorio: Relatorio,
 
         # 10. Clicar Atualizar na tela principal para recarregar a lista
         logger.info("     Clicando Atualizar na tela principal...")
-        try:
-            page.locator("xpath=/html/body/div[3]/div[1]/button[3]").evaluate("el => el.click()")
-            page.wait_for_load_state("networkidle")
-            browser.esperar(page, 2000)
-            logger.info("     Tela atualizada.")
-        except Exception as e:
-            logger.warning(f"     (aviso: atualizar: {e})")
+        _atualizar_grade(page)
 
         relatorio.add_paralisacao_ok(capa_registro, p)
         return True
 
+    except GravacaoError:
+        browser.salvar_screenshot(popup, config, f"erro_paralisacao_{capa_registro}")
+        with contextlib.suppress(Exception):
+            popup.evaluate("CloseDialog()")
+        raise
     except Exception as e:
         logger.error(f"   !! Erro ao preencher paralisacao: {e}")
         browser.salvar_screenshot(popup, config, f"erro_paralisacao_{capa_registro}")

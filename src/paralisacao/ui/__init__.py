@@ -1,0 +1,1 @@
+"""Painel local de paralisações."""

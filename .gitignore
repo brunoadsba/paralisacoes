@@ -21,6 +21,7 @@ relatorios/
 
 # Estado runtime (contém IDs internos do OpenPort)
 data/status.json
+data/operacoes/
 
 # Artefatos de ferramentas de qualidade
 .coverage

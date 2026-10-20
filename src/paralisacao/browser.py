@@ -8,28 +8,70 @@ from paralisacao.config import Config
 
 logger = logging.getLogger("paralisacao.browser")
 
-_SCRIPT_BLOQUEIO_MOUSE = """
-() => {
-    if (window.__rpaBloqueioMouse) return;
-    window.__rpaBloqueioMouse = true;
-    const eventos = [
-        "mousedown", "mouseup", "click", "dblclick",
-        "mousemove", "mouseover", "mouseout", "mouseenter", "mouseleave",
-        "contextmenu", "wheel", "pointerdown", "pointerup", "pointermove",
-    ];
-    const bloquear = (evento) => {
-        if (evento.isTrusted) {
-            evento.stopImmediatePropagation();
-            evento.preventDefault();
+_JS_PAGINA_PRONTA = """() => {
+    if (document.readyState !== 'complete') return false;
+    if (window.jQuery && window.jQuery.active > 0) return false;
+    try {
+        if (window.Sys && Sys.WebForms && Sys.WebForms.PageRequestManager) {
+            var prm = Sys.WebForms.PageRequestManager.getInstance();
+            if (prm && prm.get_isInAsyncPostBack()) return false;
         }
-    };
-    eventos.forEach((nome) => document.addEventListener(nome, bloquear, true));
-}
+    } catch (e) {}
+    return true;
+}"""
+
+_SCRIPT_ESCUDO = """
+(function(){
+  function escudo(){
+    if (document.getElementById('rpa-shield')) return;
+    var sh = document.createElement('div');
+    sh.id = 'rpa-shield';
+    sh.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:transparent;';
+    ['mousedown','mouseup','click','dblclick','contextmenu','wheel','touchstart']
+      .forEach(function(t){
+        sh.addEventListener(t, function(e){ e.stopPropagation(); e.preventDefault(); }, true);
+      });
+    var ban = document.createElement('div');
+    ban.style.cssText = 'position:fixed;right:12px;bottom:12px;z-index:2147483647;' +
+      'background:rgba(0,105,62,.9);color:#fff;font:600 11px/1.6 system-ui;' +
+      'padding:6px 14px;border-radius:999px;pointer-events:none;opacity:.95;';
+    ban.textContent = 'Automação de paralisações em execução — não interaja';
+    document.documentElement.appendChild(sh);
+    document.documentElement.appendChild(ban);
+  }
+  ['keydown','keyup','keypress'].forEach(function(t){
+    document.addEventListener(t, function(e){
+      if (!window.__rpa_input) { e.stopPropagation(); e.preventDefault(); }
+    }, true);
+  });
+  if (document.readyState === 'loading')
+    document.addEventListener('DOMContentLoaded', escudo);
+  else escudo();
+})()
 """
 
 def esperar(page: Page, ms: int = 1500) -> None:
-    """Wrapper simples para aguardar milissegundos."""
-    page.wait_for_timeout(ms)
+    """Pausa curta continua fixa. Pausa longa espera o postback do OpenPort e mantém um piso."""
+    if ms < 800:
+        page.wait_for_timeout(ms)
+        return
+    with contextlib.suppress(Exception):
+        page.wait_for_function(_JS_PAGINA_PRONTA, timeout=ms)
+    page.wait_for_timeout(400)
+
+def entrada_do_robo(page: Page):
+    """Libera teclado só enquanto o robô digita. O escudo bloqueia o operador."""
+    class _Entrada:
+        def __enter__(self):
+            with contextlib.suppress(Exception):
+                page.evaluate("window.__rpa_input = true")
+            return self
+
+        def __exit__(self, *args):
+            with contextlib.suppress(Exception):
+                page.evaluate("window.__rpa_input = false")
+            return False
+    return _Entrada()
 
 def trazer_para_primeiro_plano(page: Page) -> None:
     """Traz a página ativa para o primeiro plano e maximiza a janela."""
@@ -89,11 +131,11 @@ def maximizar_tela_cheia(page: Page) -> None:
         logger.warning("   (aviso: nao foi possivel maximizar a tela)")
 
 def bloquear_interacao_usuario(page: Page) -> None:
-    """Injeta script JS para bloquear cliques físicos e movimentação de mouse do usuário."""
+    """Cobre a página e bloqueia mouse e teclado do operador."""
     try:
-        page.evaluate(_SCRIPT_BLOQUEIO_MOUSE)
+        page.evaluate(_SCRIPT_ESCUDO)
     except Exception as e:
-        logger.debug(f"   (aviso: bloqueio de mouse: {e})")
+        logger.debug(f"   (aviso: bloqueio de interacao: {e})")
 
 def registrar_tela_cheia_em_novas_paginas(context: BrowserContext, config: Config) -> None:
     """Configura handlers de novas páginas para bloquear interação e maximizar automaticamente."""
@@ -110,8 +152,9 @@ def preencher(page: Page, config: Config, css: str, valor: str) -> None:
     """Foca e preenche um campo input por seletor CSS, aguardando visualização."""
     campo = page.locator(css)
     campo.scroll_into_view_if_needed()
-    campo.focus()
-    campo.fill(str(valor))
+    with entrada_do_robo(page):
+        campo.focus()
+        campo.fill(str(valor))
     esperar(page, 300)
     aguardar_visualizacao(page, config)
 
