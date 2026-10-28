@@ -1,6 +1,6 @@
 # Memória — RPA de paralisações OpenPort
 
-Atualizado em 28/10/2026. A regra da madrugada está na `main`, vinda da branch `fix/turno-madrugada`. Não gravar senha neste arquivo.
+Atualizado em 28/10/2026. A regra da madrugada está na `main`, vinda da branch `fix/turno-madrugada`. A limpeza de código está na `main`, vinda da branch `fix/limpeza-codigo`. Não gravar senha neste arquivo.
 
 ## Quem pede
 
@@ -19,7 +19,7 @@ Lê o resumo de embarque da Intermarítima, monta a planilha padrão do OpenPort
 - A Intermarítima entrega navio, produto, agência, data do bloco, início, fim e o texto do motivo. O usuário entrega a programação da viagem e o código numérico dos motivos que ainda não existem em `data/motivos.json`.
 - O bloco `Paralisações - DD/MM/AA` do resumo vai de 07h a 07h. A capa usa a data do bloco, exceto no turno 01:00/07:00, que vai para o dia seguinte (`data_da_capa` em `preparar.py`). Referência validada no lançamento manual do TI SUNRISE: capa 17/10, turno 1:00-7:00, `codRegistro` 75656, com as paralisações das 01:00, 04:45 e 06:45 datadas em 17/10.
 - Capa 1:00-7:00 com a data do bloco cai antes da estadia (alerta 7052010). Horário depois das 01:00 na capa 19:00-1:00 é recusado (alerta 40030). Uma recusa com código numérico não é tentada de novo.
-- `_calcular_data_hora` avança o dia quando a hora é menor que o início do período: 00:45 na capa 16/10 turno 19:00/01:00 vira 17/10 00:45; 01:00 na capa 17/10 turno 01:00/07:00 fica 17/10 01:00.
+- `calcular_data_hora`, em `popup.py`, avança o dia quando a hora é menor que o início do período: 00:45 na capa 16/10 turno 19:00/01:00 vira 17/10 00:45; 01:00 na capa 17/10 turno 01:00/07:00 fica 17/10 01:00.
 - Duplicidade: a paralisação é considerada lançada quando a grade da capa já tem uma linha que começa na mesma data e hora, seja qual for o motivo (lançamento manual pode usar outro código). O `status.json` é indexado pelo `codRegistro`.
 - A busca da 7001 trata a data como "a partir de". `buscar_capa` só abre a linha cuja coluna Data é igual à data da capa.
 - Não inventar um código fora da lista oficial. Se o texto do resumo não existir nela, usar o item mais próximo e gravar o texto original na observação (`Resumo: ...`).
@@ -95,7 +95,7 @@ Gerado em `c:\Users\danyp\Downloads\paralisacoes\dist\Paralisacoes\Paralisacoes.
 
 A planilha de teste do repositório é `data/planilha padrão.xlsx` (antes `data/Paralisacoes_YANGTZE_QUANTUM.xlsx`). O navio dentro dela continua YANGTZE QUANTUM, programação 1766.
 
-O executável gerado em 28/10/2026 já contém a regra da madrugada e a DDS 434. O teste do painel em 20/10/2026, no QAS, só leu a planilha YANGTZE e não gravou.
+O executável gerado em 28/10/2026 já contém a regra da madrugada e a DDS 434. Ele foi montado antes da limpeza de código do mesmo dia; o resultado no OpenPort é o mesmo. O teste do painel em 20/10/2026, no QAS, só leu a planilha YANGTZE e não gravou.
 
 Flags da CLI colocadas antes do subcomando `executar` são ignoradas. O dry-run válido é `python -m paralisacao executar --dry-run`.
 
@@ -104,6 +104,17 @@ Flags da CLI colocadas antes do subcomando `executar` são ignoradas. O dry-run 
 - `src/paralisacao/resumo.py` escolhe a aba pelo título `Paralisações` com data. A primeira aba BANCO DE DADOS contém "PARALISAÇÕES DA OPERAÇÃO" e não serve.
 - `src/paralisacao/preparar.py` monta as linhas padrão, calcula pendências e grava o xlsx. `executar_preparar` sai com código 2 se ainda houver pendência.
 - O leitor genérico da planilha padrão usa a programação e a tabela. A célula do operador no cabeçalho é ignorada.
+
+## Limpeza de código (28/10/2026)
+
+O lançamento no OpenPort não mudou. Os 60 testes passaram com `pytest -o addopts=""`.
+
+- `eh_planilha`, em `entrada.py`, filtra `.xlsx`, `.xlsm` e o temporário `~$` na linha de comando e no upload do painel.
+- A observação do resumo no painel usa `texto_observacao`, a mesma função da gravação.
+- `limpar_alerta` zera o alerta anterior antes de gravar.
+- `motivos.json` é lido uma vez por alteração do arquivo. Salvar um código em Pendências descarta essa leitura.
+- `buscar_capa` lê o texto da grade da 7001 numa única passagem e só abre a linha cuja data é a da capa.
+- A volta para a lista, quando ainda há capa, está em `_ir_para_proxima`.
 
 ## Confiabilidade ainda aberta
 
