@@ -89,8 +89,11 @@ O RPA mantém em tempo de execução um histórico local das operações. Antes 
 
 ### Estados das Capas no Status
 * `pendente`: Capa identificada na planilha, mas ainda não processada.
-* `parcial`: Capa processada, porém uma ou mais paralisações falharam ou foram puladas por falta de mapeamento de motivo.
-* `completa`: Capa processada e todas as paralisações foram registradas com sucesso.
+* `parcial`: Há paralisação com status `erro`. A gravação foi recusada ou falhou.
+* `completa`: Todas as paralisações registradas no arquivo estão `ok`.
+* `erro` (na paralisação): a linha não gravou. Um sucesso posterior no mesmo horário substitui esse erro.
+
+A linha de comando devolve 1 quando a rodada tem falha grave, capa com erro, capa inexistente ou paralisação recusada. Motivo ainda sem código e linha já lançada saem com 0.
 
 ---
 

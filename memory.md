@@ -1,6 +1,6 @@
 # Memória — RPA de paralisações OpenPort
 
-Atualizado em 28/10/2026. A regra da madrugada está na `main`, vinda da branch `fix/turno-madrugada`. A limpeza de código está na `main`, vinda da branch `fix/limpeza-codigo`. Não gravar senha neste arquivo.
+Atualizado em 28/10/2026. A regra da madrugada está na `main`, vinda da branch `fix/turno-madrugada`. A limpeza de código está na `main`, vinda da branch `fix/limpeza-codigo`. O código de saída e o status de erro estão na `main`, vindos da branch `fix/saida-status`. Não gravar senha neste arquivo.
 
 ## Quem pede
 
@@ -95,7 +95,7 @@ Gerado em `c:\Users\danyp\Downloads\paralisacoes\dist\Paralisacoes\Paralisacoes.
 
 A planilha de teste do repositório é `data/planilha padrão.xlsx` (antes `data/Paralisacoes_YANGTZE_QUANTUM.xlsx`). O navio dentro dela continua YANGTZE QUANTUM, programação 1766.
 
-O executável gerado em 28/10/2026 já contém a regra da madrugada e a DDS 434. Ele foi montado antes da limpeza de código do mesmo dia; o resultado no OpenPort é o mesmo. O teste do painel em 20/10/2026, no QAS, só leu a planilha YANGTZE e não gravou.
+O executável gerado de novo em 28/10/2026 contém a regra da madrugada, a DDS 434, a limpeza de código, o código de saída 1 e o status `erro`. O Chromium embutido continua o 1148. O teste do painel em 20/10/2026, no QAS, só leu a planilha YANGTZE e não gravou.
 
 Flags da CLI colocadas antes do subcomando `executar` são ignoradas. O dry-run válido é `python -m paralisacao executar --dry-run`.
 
@@ -116,10 +116,15 @@ O lançamento no OpenPort não mudou. Os 60 testes passaram com `pytest -o addop
 - `buscar_capa` lê o texto da grade da 7001 numa única passagem e só abre a linha cuja data é a da capa.
 - A volta para a lista, quando ainda há capa, está em `_ir_para_proxima`.
 
+## Código de saída e status (28/10/2026)
+
+Os 70 testes passaram com `pytest -o addopts=""`.
+
+- `executar` devolve 1 quando há falha fatal, capa com erro, capa inexistente ou paralisação recusada. Motivo sem código e linha já lançada continuam saindo com 0.
+- Uma paralisação que não grava entra no `status.json` como `erro`. A capa só fica `completa` quando todas as linhas registradas estão `ok`. Um sucesso posterior na mesma hora substitui o erro.
+
 ## Confiabilidade ainda aberta
 
-- `executar` em `main.py` pode terminar com código 0 mesmo após falha fatal.
-- Status "completa" pode mentir se a falha não for anexada.
 - A deduplicação na grade compara a data e a hora de início, não o texto do motivo.
 - `OPERADOR` do ambiente é ignorado: o valor fixo é 30002.
 - Datas nativas do Excel na planilha genérica não saem como DD/MM/AAAA. O parser do resumo trata `datetime.time`.
