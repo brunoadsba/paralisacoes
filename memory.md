@@ -1,6 +1,6 @@
 # Memória — RPA de paralisações OpenPort
 
-Atualizado em 20/10/2026. Branch de trabalho: `fix/planilha-escolhida`. Não gravar senha neste arquivo.
+Atualizado em 28/10/2026. A regra da madrugada está na `main`, vinda da branch `fix/turno-madrugada`. Não gravar senha neste arquivo.
 
 ## Quem pede
 
@@ -42,7 +42,15 @@ Aba certa: **Resumo**. Motivo na coluna cujo cabeçalho contém "Motivo". A colu
 
 Doze paralisações em cinco capas (16/10 e 17/10/2026). Motivos do resumo: DDS, CHUVA, TROCA DE TURNO, DRAFT SURVEY, MANUTENÇÃO SPREADER.
 
-Programação digitada na tela e ainda não necessariamente gravada: **1772**. Os três motivos do resumo que não estão na lista oficial já têm aproximação em `data/motivos.json`. A gravação ao vivo no QAS ainda não foi feita.
+Programação **1772**, gravada em produção em 28/10/2026. As 12 paralisações estão homologadas:
+
+- 75647 — 16/10, 13:00–19:00
+- 75648 — 16/10, 19:00–1:00
+- 75656 — 17/10, 1:00–7:00 (madrugada lançada manualmente)
+- 75649 — 17/10, 7:00–13:00
+- 75650 — 17/10, 13:00–19:00
+
+As DDS das 13:00 e das 19:00 ficaram homologadas como código 34 (CONVENIÊNCIA DO USUÁRIO). O robô não reescreve uma linha que já começa naquele horário. Lançamento novo do texto DDS usa 434.
 
 ## URLs
 
@@ -87,7 +95,7 @@ Gerado em `c:\Users\danyp\Downloads\paralisacoes\dist\Paralisacoes\Paralisacoes.
 
 A planilha de teste do repositório é `data/planilha padrão.xlsx` (antes `data/Paralisacoes_YANGTZE_QUANTUM.xlsx`). O navio dentro dela continua YANGTZE QUANTUM, programação 1766.
 
-Teste do painel pelo executável, em 20/10/2026, no QAS: a planilha foi lida, o resumo mostrou 7 capas e 16 paralisações, as pendências não pediram código e a execução listou as 16 na fila. **Gravar a primeira** não foi acionado. A tela Resultado ficou em "Nenhuma rodada concluída ainda". A gravação ao vivo no OpenPort continua pendente.
+O executável gerado em 28/10/2026 já contém a regra da madrugada e a DDS 434. O teste do painel em 20/10/2026, no QAS, só leu a planilha YANGTZE e não gravou.
 
 Flags da CLI colocadas antes do subcomando `executar` são ignoradas. O dry-run válido é `python -m paralisacao executar --dry-run`.
 
@@ -101,7 +109,7 @@ Flags da CLI colocadas antes do subcomando `executar` são ignoradas. O dry-run 
 
 - `executar` em `main.py` pode terminar com código 0 mesmo após falha fatal.
 - Status "completa" pode mentir se a falha não for anexada.
-- A deduplicação na grade é por substring.
+- A deduplicação na grade compara a data e a hora de início, não o texto do motivo.
 - `OPERADOR` do ambiente é ignorado: o valor fixo é 30002.
 - Datas nativas do Excel na planilha genérica não saem como DD/MM/AAAA. O parser do resumo trata `datetime.time`.
 - `HEADLESS` perde para `PRIMEIRO_PLANO`.
