@@ -1,4 +1,5 @@
 import argparse
+import contextlib
 import logging
 import sys
 import time
@@ -33,11 +34,25 @@ def mostrar_plano(dados: DadosPlanilha, config: Config) -> None:
             marca = f"-> {sist}{obs}" if sist else "MOTIVO NAO MAPEADO"
             logger.info(f"     - {p.inicio} -> {p.fim} | {p.motivo} {marca}")
 
+def _abrir_ou_criar_capa(page, config: Config, c, prog_navio: str) -> int | None:
+    from paralisacao import capa, navegacao
+
+    cod_registro = capa.buscar_capa(page, config, c, prog_navio)
+    if cod_registro:
+        return cod_registro
+    logger.info("   Capa nao encontrada. Tentando criar...")
+    cod_registro = capa.criar_capa(page, config, c, prog_navio)
+    if cod_registro:
+        logger.info(f"   Capa criada com sucesso (codRegistro={cod_registro}).")
+        return cod_registro
+    navegacao.abrir_tela_7001(page, config)
+    return capa.buscar_capa(page, config, c, prog_navio)
+
 def executar(dados: DadosPlanilha, config: Config, relatorio: Relatorio, status_file: Path, planilha_path: str = "") -> None:
     """Orquestra a execução completa do RPA pelo Playwright."""
     from playwright.sync_api import sync_playwright
 
-    from paralisacao import browser, capa, navegacao, popup, status
+    from paralisacao import browser, navegacao, popup, status
     prog_navio = dados.prog_navio or ""
     if not prog_navio:
         logger.warning("!! Programacao do navio nao encontrada na planilha.")
@@ -70,14 +85,18 @@ def executar(dados: DadosPlanilha, config: Config, relatorio: Relatorio, status_
             for i, c in enumerate(dados.capas):
                 logger.info(f"\n=== Processando capa {c.registro} ===")
 
-                cod_registro = capa.buscar_capa(page, config, c, prog_navio)
-                if not cod_registro or cod_registro <= 0:
-                    logger.info("   Capa nao encontrada. Tentando criar...")
-                    cod_registro = capa.criar_capa(page, config, c, prog_navio)
-                    if not cod_registro:
-                        relatorio.add_capa_nao_encontrada(c.registro)
-                        continue
-                    logger.info(f"   Capa criada com sucesso (codRegistro={cod_registro}).")
+                try:
+                    cod_registro = _abrir_ou_criar_capa(page, config, c, prog_navio)
+                except Exception as exc:
+                    logger.error(f"!! Capa {c.registro}: {exc}")
+                    relatorio.add_capa_erro(c.registro, str(exc).splitlines()[0])
+                    browser.salvar_screenshot(page, config, f"erro_capa{c.registro}")
+                    with contextlib.suppress(Exception):
+                        navegacao.abrir_tela_7001(page, config)
+                    continue
+                if not cod_registro:
+                    relatorio.add_capa_nao_encontrada(c.registro)
+                    continue
 
                 relatorio.add_capa_ok(c.registro, cod_registro)
                 logger.info(f"Capa aberta (codRegistro={cod_registro}). {len(c.paralisacoes)} paralisacao(oes) pendente(s).")
@@ -93,7 +112,7 @@ def executar(dados: DadosPlanilha, config: Config, relatorio: Relatorio, status_
 
                 # Carrega status local
                 status_dict = status.carregar_status(status_file)
-                sc = status._status_capa(status_dict, c.registro)
+                sc = status._status_capa(status_dict, str(cod_registro))
                 sc["codRegistro"] = cod_registro
                 sc["navio"] = c.navio
                 sc["data"] = c.data
@@ -101,10 +120,14 @@ def executar(dados: DadosPlanilha, config: Config, relatorio: Relatorio, status_
 
                 # Ler grid do OpenPort para detectar duplicatas existentes online
                 grid = status.ler_grid_paralisacoes(page)
-                if grid:
-                    logger.info(f"   Grid contem {len(grid)-1} paralisacao(oes) ja registrada(s).")
-                else:
-                    logger.warning("   (nao foi possivel ler a grid de paralisações)")
+                if not grid:
+                    logger.error("   !! Grade de paralisações ilegível. Capa pulada para não duplicar lançamentos.")
+                    relatorio.add_capa_erro(c.registro, "grade de paralisações ilegível")
+                    browser.salvar_screenshot(page, config, f"grade_ilegivel_capa{c.registro}")
+                    if i < len(dados.capas) - 1:
+                        navegacao.voltar_para_lista(page, config)
+                    continue
+                logger.info(f"   Grid contem {len(grid)-1} paralisacao(oes) ja registrada(s).")
 
                 # Processar cada paralisação da capa
                 for p in c.paralisacoes:
@@ -117,10 +140,12 @@ def executar(dados: DadosPlanilha, config: Config, relatorio: Relatorio, status_
                         relatorio.add_paralisacao_ok(c.registro, p)
                         continue
 
-                    # Verificar se já existe na grid online do OpenPort
-                    if codigo and status.paralisacao_ja_existe(grid, p, codigo, config):
-                        logger.info(f"   - {p.inicio}->{p.fim} {p.motivo}: ja registrada (grid OpenPort)")
-                        status._marcar_ok_no_status(sc, p, codigo)
+                    inicio = popup._calcular_data_hora(c.data, c.periodo, p.inicio)
+                    existente = status.paralisacao_ja_existe(grid, inicio)
+                    if existente:
+                        logger.info(f"   - {p.inicio}->{p.fim} {p.motivo}: ja existe no OpenPort ({existente})")
+                        if codigo:
+                            status._marcar_ok_no_status(sc, p, codigo)
                         status.salvar_status(status_dict, status_file)
                         relatorio.add_paralisacao_ok(c.registro, p)
                         continue

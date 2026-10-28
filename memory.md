@@ -17,13 +17,16 @@ Lê o resumo de embarque da Intermarítima, monta a planilha padrão do OpenPort
 ## Decisões fechadas
 
 - A Intermarítima entrega navio, produto, agência, data do bloco, início, fim e o texto do motivo. O usuário entrega a programação da viagem e o código numérico dos motivos que ainda não existem em `data/motivos.json`.
-- A data da capa é a data impressa no bloco `Paralisações - DD/MM/AA`, não a manhã seguinte do calendário.
-- O turno sai do horário de início. A função `_calcular_data_hora` só avança o dia quando a hora é menor que o início do período. Por isso 00:45 na capa 16/10 turno 19:00/01:00 continua nesse bloco; 01:00 fica na capa 01:00/07:00 da mesma data do bloco.
+- O bloco `Paralisações - DD/MM/AA` do resumo vai de 07h a 07h. A capa usa a data do bloco, exceto no turno 01:00/07:00, que vai para o dia seguinte (`data_da_capa` em `preparar.py`). Referência validada no lançamento manual do TI SUNRISE: capa 17/10, turno 1:00-7:00, `codRegistro` 75656, com as paralisações das 01:00, 04:45 e 06:45 datadas em 17/10.
+- Capa 1:00-7:00 com a data do bloco cai antes da estadia (alerta 7052010). Horário depois das 01:00 na capa 19:00-1:00 é recusado (alerta 40030). Uma recusa com código numérico não é tentada de novo.
+- `_calcular_data_hora` avança o dia quando a hora é menor que o início do período: 00:45 na capa 16/10 turno 19:00/01:00 vira 17/10 00:45; 01:00 na capa 17/10 turno 01:00/07:00 fica 17/10 01:00.
+- Duplicidade: a paralisação é considerada lançada quando a grade da capa já tem uma linha que começa na mesma data e hora, seja qual for o motivo (lançamento manual pode usar outro código). O `status.json` é indexado pelo `codRegistro`.
+- A busca da 7001 trata a data como "a partir de". `buscar_capa` só abre a linha cuja coluna Data é igual à data da capa.
 - Não inventar um código fora da lista oficial. Se o texto do resumo não existir nela, usar o item mais próximo e gravar o texto original na observação (`Resumo: ...`).
-  - TROCA DE TURNO → 435 TROCA TURNO - AGUARD.OPERADORA. A Intermarítima é a operadora. 434 é espera da TPA.
+  - TROCA DE TURNO → 435 TROCA TURNO - AGUARD.OPERADORA. A Intermarítima é a operadora.
   - DRAFT SURVEY → 460 VISTORIA. 299 seria espera do arqueador, não a vistoria em si.
   - MANUTENÇÃO SPREADER → 453 INTERDIÇÃO DO EQUIPAMENTO. 458 é manutenção da CODEBA.
-- DDS mapeia para CONVENIENCIA DO USUARIO, código 34. CHUVA é código 5.
+- DDS mapeia para TROCA TURNO - AGUARD. TPA, código 434, e a observação guarda `Resumo: DDS`. CHUVA é código 5. DESCANSO continua em CONVENIENCIA DO USUARIO, código 34.
 - O lote só libera depois da primeira paralisação gravada com sucesso (`STATE["uma_ok"]`).
 - A interface reaproveita a casca visual da Automação SEV (`rpa-intermaritima`). Não copiar NF-e, PR, 9401 nem o CNPJ solicitante da SEV.
 

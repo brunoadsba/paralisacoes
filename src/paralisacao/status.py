@@ -1,14 +1,14 @@
 import json
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 
 from playwright.sync_api import Page
 
-from paralisacao import mapeamento
-from paralisacao.config import Config
-
 logger = logging.getLogger("paralisacao.status")
+
+_DATA_HORA = re.compile(r"\d{2}/\d{2}/\d{4} \d{2}:\d{2}")
 
 def _normalizar_horario(h: str) -> str:
     """Normaliza o formato de horário removendo segundos se for ':00'."""
@@ -104,14 +104,13 @@ def ler_grid_paralisacoes(page: Page) -> list[list[str]]:
     """)
     return result if result else []
 
-def paralisacao_ja_existe(grid: list[list[str]], p, codigo: int, config: Config) -> bool:
-    """Verifica se a paralisação já existe na grid do OpenPort."""
-    if not grid:
-        return False
-    hi = _normalizar_horario(p.inicio)
-    nome_sistema = mapeamento.motivo_sistema(p.motivo, config) or ""
-    for row in grid[1:]:  # skip header
-        row_text = " ".join(row).upper()
-        if hi in row_text and nome_sistema.upper() in row_text:
-            return True
-    return False
+def paralisacao_ja_existe(grid: list[list[str]], inicio: str) -> str | None:
+    """Devolve a linha da grade que começa em `inicio` ('DD/MM/AAAA HH:MM'), seja qual for o motivo.
+
+    Lançamentos manuais podem usar outro código; o início é o que identifica a paralisação na capa.
+    """
+    for row in grid[1:]:
+        horarios = [achado.group(0) for celula in row if (achado := _DATA_HORA.search(celula))]
+        if horarios and horarios[0] == inicio:
+            return " | ".join(celula for celula in row if celula)
+    return None

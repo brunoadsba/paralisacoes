@@ -1,5 +1,6 @@
 import logging
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import openpyxl
@@ -24,7 +25,7 @@ class LinhaPadrao:
 
 
 def periodo_de_inicio(inicio: str) -> str:
-    """Turno OpenPort a partir do horário de início. A data da capa permanece a do bloco."""
+    """Turno OpenPort a partir do horário de início."""
     hora, minuto = (int(parte) for parte in inicio.split(":")[:2])
     minutos = hora * 60 + minuto
     if minutos >= 19 * 60 or minutos < 60:
@@ -36,19 +37,28 @@ def periodo_de_inicio(inicio: str) -> str:
     return "13:00/19:00"
 
 
+def data_da_capa(data_bloco: str, periodo: str) -> str:
+    """O bloco vai de 07h a 07h. No OpenPort, 01:00-07:00 é a capa do dia seguinte."""
+    if periodo != "01:00/07:00":
+        return data_bloco
+    dia = datetime.strptime(data_bloco, "%d/%m/%Y") + timedelta(days=1)
+    return dia.strftime("%d/%m/%Y")
+
+
 def montar_linhas(resumo: ResumoEmbarque) -> list[LinhaPadrao]:
     registros: dict[tuple[str, str], str] = {}
     linhas: list[LinhaPadrao] = []
     for evento in resumo.eventos:
         periodo = periodo_de_inicio(evento.inicio)
-        chave = (evento.data, periodo)
+        data = data_da_capa(evento.data, periodo)
+        chave = (data, periodo)
         if chave not in registros:
             registros[chave] = str(len(registros) + 1)
         linhas.append(
             LinhaPadrao(
                 registro=registros[chave],
                 navio=resumo.navio,
-                data=evento.data,
+                data=data,
                 produto=resumo.produto,
                 periodo=periodo,
                 inicio=evento.inicio,

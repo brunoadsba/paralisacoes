@@ -68,18 +68,37 @@ class TestStatusCapaLogic:
         assert sc["status"] == "parcial"
 
 class TestParalisacaoJaExiste:
-    def test_paralisacao_existe_na_grid(self, config):
+    def test_paralisacao_existe_na_grid(self):
         grid = [
-            ["Inicio", "Fim", "Motivo"],
-            ["09/07/2026 13:00", "09/07/2026 13:15", "CONVENIENCIA DO USUARIO"],
+            ["", "Inicio", "Fim", "Motivo"],
+            ["", "09/07/2026 13:00", "09/07/2026 13:15", "CONVENIENCIA DO USUARIO"],
         ]
-        p = Paralisacao(inicio="13:00", fim="13:15", motivo="DDS")
-        assert paralisacao_ja_existe(grid, p, 34, config)
+        assert paralisacao_ja_existe(grid, "09/07/2026 13:00")
 
-    def test_paralisacao_nao_existe_na_grid(self, config):
+    def test_paralisacao_nao_existe_na_grid(self):
         grid = [
-            ["Inicio", "Fim", "Motivo"],
-            ["09/07/2026 14:00", "09/07/2026 14:15", "CHUVA"],
+            ["", "Inicio", "Fim", "Motivo"],
+            ["", "09/07/2026 14:00", "09/07/2026 14:15", "CHUVA"],
         ]
-        p = Paralisacao(inicio="13:00", fim="13:15", motivo="DDS")
-        assert not paralisacao_ja_existe(grid, p, 34, config)
+        assert not paralisacao_ja_existe(grid, "09/07/2026 13:00")
+
+    def test_fim_igual_ao_inicio_nao_conta(self):
+        grid = [
+            ["", "Inicio", "Fim", "Motivo"],
+            ["", "17/10/2026 00:45", "17/10/2026 01:00", "TROCA TURNO - AGUARD.OPERADORA"],
+        ]
+        assert not paralisacao_ja_existe(grid, "17/10/2026 01:00")
+
+    def test_lancamento_manual_com_outro_codigo_conta(self):
+        grid = [
+            ["", "Inicio", "Fim", "Motivo"],
+            ["", "17/10/2026 01:00", "17/10/2026 01:15", "DIALOGO DE SEGURANCA"],
+        ]
+        assert paralisacao_ja_existe(grid, "17/10/2026 01:00")
+
+    def test_mesmo_horario_em_outro_dia_nao_conta(self):
+        grid = [
+            ["", "Inicio", "Fim", "Motivo"],
+            ["", "16/10/2026 13:00", "16/10/2026 13:15", "CONVENIENCIA DO USUARIO"],
+        ]
+        assert not paralisacao_ja_existe(grid, "17/10/2026 13:00")

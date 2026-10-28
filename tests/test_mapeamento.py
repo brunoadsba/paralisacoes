@@ -41,7 +41,9 @@ class TestMotivoSistema:
         assert motivo_sistema("CHUVA", config) == "CHUVA"
 
     def test_mapeamento_dds(self, config):
-        assert motivo_sistema("DDS", config) == "CONVENIENCIA DO USUARIO"
+        assert motivo_sistema("DDS", config) == "TROCA TURNO - AGUARD. TPA"
+        assert codigo_motivo("TROCA TURNO - AGUARD. TPA", config) == 434
+        assert texto_observacao("DDS", "TROCA TURNO - AGUARD. TPA") == "Resumo: DDS"
 
     def test_case_insensitive(self, config):
         assert motivo_sistema("chuva", config) == "CHUVA"

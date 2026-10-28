@@ -2,7 +2,7 @@
   "_comentario": "Mapeamento: motivo da planilha -> motivo do sistema OpenPort",
   "mapeamentos": {
     "CHUVA": "CHUVA",
-    "DDS": "CONVENIENCIA DO USUARIO",
+    "DDS": "TROCA TURNO - AGUARD. TPA",
     "DESCANSO": "CONVENIENCIA DO USUARIO",
     "DDS / CONVENIENCIA DO USUARIO": "CONVENIENCIA DO USUARIO",
     "DEFEITO NO SPEED": "DEFEITO MECANICO LINHA DE EMBARQUE",
@@ -11,6 +11,7 @@
     "MANUTENCAO SPREADER": "INTERDIÇÃO DO EQUIPAMENTO"
   },
   "codigos": {
+    "TROCA TURNO - AGUARD. TPA": 434,
     "TROCA TURNO - AGUARD.OPERADORA": 435,
     "VISTORIA": 460,
     "INTERDIÇÃO DO EQUIPAMENTO": 453

@@ -76,7 +76,7 @@ class Config:
 
         motivo_correspondencia = {
             "CHUVA":                          "CHUVA",
-            "DDS":                            "CONVENIENCIA DO USUARIO",
+            "DDS":                            "TROCA TURNO - AGUARD. TPA",
             "DESCANSO":                       "CONVENIENCIA DO USUARIO",
             "DDS / CONVENIENCIA DO USUARIO":  "CONVENIENCIA DO USUARIO",
             "DEFEITO NO SPEED":               "DEFEITO MECANICO LINHA DE EMBARQUE",

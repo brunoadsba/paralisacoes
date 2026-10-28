@@ -54,7 +54,7 @@ class TestLerResumo:
 
 
 class TestMontarLinhas:
-    def test_turno_usa_a_data_do_bloco(self, tmp_path):
+    def test_madrugada_vai_para_a_capa_do_dia_seguinte(self, tmp_path):
         caminho = tmp_path / "resumo.xlsx"
         _resumo_minimo(caminho)
         linhas = montar_linhas(ler_resumo(caminho))
@@ -62,7 +62,7 @@ class TestMontarLinhas:
         assert [(ln.registro, ln.data, ln.periodo, ln.inicio) for ln in linhas] == [
             ("1", "16/10/2026", "13:00/19:00", "13:00"),
             ("2", "16/10/2026", "19:00/01:00", "00:45"),
-            ("3", "16/10/2026", "01:00/07:00", "01:00"),
+            ("3", "17/10/2026", "01:00/07:00", "01:00"),
             ("4", "17/10/2026", "07:00/13:00", "07:00"),
         ]
 

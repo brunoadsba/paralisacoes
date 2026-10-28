@@ -13,22 +13,37 @@ from paralisacao.retry import com_retry
 
 logger = logging.getLogger("paralisacao.popup")
 
+def _aguardar_recarga(page: Page) -> None:
+    with contextlib.suppress(Exception):
+        page.wait_for_load_state("domcontentloaded", timeout=15000)
+    with contextlib.suppress(Exception):
+        page.wait_for_load_state("networkidle", timeout=8000)
+    browser.esperar(page, 1500)
+
+
 def _atualizar_grade(page: Page) -> None:
-    """#REFRESH é o ID estável da toolbar. O xpath posicional fica só como reserva."""
-    for seletor in ("#REFRESH", "xpath=/html/body/div[3]/div[1]/button[3]"):
-        try:
-            local = page.locator(seletor)
-            if local.count() == 0:
-                continue
-            local.first.evaluate("el => el.click()")
-            with contextlib.suppress(Exception):
-                page.wait_for_load_state("networkidle")
-            browser.esperar(page, 1500)
-            logger.info("     Tela atualizada.")
-            return
-        except Exception as exc:
-            logger.warning(f"     (aviso: atualizar {seletor}: {exc})")
-    logger.warning("     (aviso: botão Atualizar não encontrado)")
+    """O OpenPort pode recarregar a tela sozinho ao fechar o popup; o escudo some junto."""
+    _aguardar_recarga(page)
+    try:
+        for tentativa in range(2):
+            try:
+                for seletor in ("#REFRESH", "xpath=/html/body/div[3]/div[1]/button[3]"):
+                    local = page.locator(seletor)
+                    if local.count() == 0:
+                        continue
+                    local.first.evaluate("el => el.click()")
+                    _aguardar_recarga(page)
+                    logger.info("     Tela atualizada.")
+                    return
+                logger.warning("     (aviso: botão Atualizar não encontrado)")
+                return
+            except Exception as exc:
+                if "context was destroyed" not in str(exc) or tentativa == 1:
+                    logger.warning(f"     (aviso: atualizar: {exc})")
+                    return
+                _aguardar_recarga(page)
+    finally:
+        browser.bloquear_interacao_usuario(page)
 
 
 def abrir_popup_paralisacao(page: Page, config: Config, cod_registro: int) -> Page | None:
@@ -239,11 +254,16 @@ def adicionar_paralisacao(page: Page, config: Config, relatorio: Relatorio,
             logger.info(f"     Preenchendo motivo codigo={codigo} ({nome_sistema})")
             campo_motivo = popup.locator(config.css["popup_motivo"])
             with browser.entrada_do_robo(popup):
-                campo_motivo.click()
-                browser.esperar(popup, 200)
-                campo_motivo.fill(str(codigo))
-                browser.esperar(popup, 300)
-                campo_motivo.press("Tab")
+                campo_motivo.evaluate(
+                    """(el, valor) => {
+                        el.focus();
+                        el.value = String(valor);
+                        el.dispatchEvent(new Event('input', { bubbles: true }));
+                        el.dispatchEvent(new Event('change', { bubbles: true }));
+                        el.blur();
+                    }""",
+                    str(codigo),
+                )
             browser.esperar(popup, 1500)
         else:
             logger.info(f"     !! Codigo nao encontrado para '{nome_sistema}'. Tentando lookup...")
@@ -275,11 +295,20 @@ def adicionar_paralisacao(page: Page, config: Config, relatorio: Relatorio,
 
         # 7. Gravar
         logger.info("     Gravando paralisacao...")
+        popup._rpa_ultimo_alerta = ""
         browser.acionar(popup, config, config.css["popup_btn_gravar"])
         with contextlib.suppress(Exception):
             popup.wait_for_load_state("networkidle", timeout=8000)
         with contextlib.suppress(Exception):
             browser.esperar(popup, 2000)
+
+        recusa = browser.alerta_de_recusa(browser.consumir_alerta(popup))
+        if recusa:
+            logger.warning(f"     OpenPort recusou: {recusa}")
+            relatorio.add_paralisacao_erro(capa_registro, p, recusa)
+            with contextlib.suppress(Exception):
+                popup.evaluate("CloseDialog()")
+            return False
 
         # 8. Verificar confirmacao real
         _verificar_gravacao(popup)

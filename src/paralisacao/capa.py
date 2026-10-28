@@ -35,12 +35,23 @@ def buscar_capa(page: Page, config: Config, capa: Capa, prog_navio: str) -> int 
 
     grid = page.locator(config.css["grid_resultados"])
     rows = grid.locator("tr")
-    if rows.count() <= 1:
-        logger.info(f"   Capa {capa.registro} nao encontrada. Registros: {rows.count() - 1}")
+    linha = None
+    for indice in range(1, rows.count()):
+        celulas = [texto.strip() for texto in rows.nth(indice).locator("td").all_inner_texts()]
+        if capa.data in celulas:
+            linha = rows.nth(indice)
+            break
+    if linha is None:
+        logger.info(f"   Capa {capa.registro} nao encontrada em {capa.data}. Registros na grade: {rows.count() - 1}")
         return None
 
     logger.info("   Capa encontrada. Clicando no resultado.")
-    rows.nth(1).locator("td").first.click()
+    linha.locator("td").first.evaluate(
+        """el => {
+            const alvo = el.querySelector('a, input, button') || el;
+            alvo.click();
+        }"""
+    )
     with contextlib.suppress(Exception):
         page.wait_for_load_state("networkidle")
     browser.esperar(page, 3000)
@@ -50,6 +61,8 @@ def buscar_capa(page: Page, config: Config, capa: Capa, prog_navio: str) -> int 
     cod_registro = page.evaluate("document.querySelector('input[name=codRegistro]')?.value || ''")
     cod_registro = int(cod_registro) if cod_registro and str(cod_registro).isdigit() else 0
     logger.info(f"   codRegistro={cod_registro}")
+    if cod_registro <= 0:
+        raise RuntimeError("A capa apareceu na grade, mas o clique não abriu o cadastro.")
     return cod_registro
 
 @com_retry(tentativas=3, backoff_base=2.0)
@@ -95,10 +108,12 @@ def criar_capa(page: Page, config: Config, capa: Capa, prog_navio: str) -> int |
     logger.info("   Gravando nova capa...")
     page.evaluate("MySubmit('salvar', 'cadastro.aspx?WCI=frmEdtTurmaTrabVeiculos_007&Mv=Salvar')")
     try:
-        browser.esperar(page, 3000)
         with contextlib.suppress(Exception):
-            page.wait_for_load_state("networkidle", timeout=8000)
-        browser.esperar(page, 2000)
+            page.wait_for_function(
+                "() => /^\\d+$/.test(document.querySelector('input[name=codRegistro]')?.value || '')",
+                timeout=25000,
+            )
+        browser.esperar(page, 1500)
         cod_registro = page.evaluate("document.querySelector('input[name=codRegistro]')?.value || ''")
     except Exception:
         logger.warning("   Capa pode ter sido gravada. Nova tentativa não abrirá outro Mv=Novo.")
@@ -112,5 +127,8 @@ def criar_capa(page: Page, config: Config, capa: Capa, prog_navio: str) -> int |
         return cod_registro
 
     logger.warning("   !! Nao foi possivel obter codRegistro da nova capa.")
+    with contextlib.suppress(Exception):
+        texto = page.locator("body").inner_text(timeout=3000).strip()
+        logger.warning(f"   Tela após gravar: {texto[:400]}")
     browser.salvar_screenshot(page, config, f"criar_capa_erro_{capa.registro}")
     return None

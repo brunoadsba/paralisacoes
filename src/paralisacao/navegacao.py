@@ -48,17 +48,43 @@ def login(page: Page, config: Config) -> None:
         browser.salvar_screenshot(page, config, "login_falhou")
         raise LoginError("Login nao concluido. Verifique credenciais ou seletores.")
 
+def _escolher_sugestao_7001(page: Page) -> bool:
+    """Clica na sugestão do menu. O clique via JS atravessa o escudo da página."""
+    for seletor in (
+        ".tt-suggestion:has-text('7001')",
+        ".tt-selectable:has-text('7001')",
+        "a#menu_7001",
+    ):
+        item = page.locator(seletor).first
+        try:
+            item.wait_for(state="visible", timeout=2000)
+            item.evaluate("el => el.click()")
+            return True
+        except Exception:
+            continue
+    return False
+
+
 def abrir_tela_7001(page: Page, config: Config) -> None:
     """Abre a tela de cadastro/consulta 7001."""
     logger.info("Abrindo a tela 7001")
     browser.preencher(page, config, config.css["menu_acesso"], "7001")
     browser.esperar(page, 500)
-    page.keyboard.press("Enter")
+    if not _escolher_sugestao_7001(page):
+        logger.info("Sugestao do menu nao clicada. Confirmando com Enter.")
+        with browser.entrada_do_robo(page):
+            page.keyboard.press("Enter")
 
     with contextlib.suppress(Exception):
         page.wait_for_load_state("networkidle")
 
     browser.esperar(page, 3000)
+    try:
+        page.locator(config.css["busca_operador"]).wait_for(state="visible", timeout=8000)
+    except PWTimeout:
+        logger.info("Tela 7001 ainda fechada. Acionando a lupa do menu.")
+        browser.acionar(page, config, "#frmMenu button[type=submit]")
+        page.locator(config.css["busca_operador"]).wait_for(state="visible", timeout=8000)
     browser.bloquear_interacao_usuario(page)
     browser.maximizar_tela_cheia(page)
 

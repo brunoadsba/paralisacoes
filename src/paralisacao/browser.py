@@ -1,5 +1,6 @@
 import contextlib
 import logging
+import re
 from datetime import datetime
 
 from playwright.sync_api import BrowserContext, Page
@@ -137,9 +138,36 @@ def bloquear_interacao_usuario(page: Page) -> None:
     except Exception as e:
         logger.debug(f"   (aviso: bloqueio de interacao: {e})")
 
+_RECUSA_OPENPORT = re.compile(r"^\d+;")
+
+
+def alerta_de_recusa(mensagem: str | None) -> str | None:
+    """Alerta com código numérico é recusa do OpenPort. Não vale a pena gravar de novo."""
+    texto = (mensagem or "").strip()
+    if _RECUSA_OPENPORT.match(texto):
+        return texto
+    return None
+
+
+def _registrar_alerta(dialogo) -> None:
+    logger.warning(f"   Alerta do OpenPort ({dialogo.type}): {dialogo.message}")
+    if dialogo.type == "alert":
+        with contextlib.suppress(Exception):
+            dialogo.page._rpa_ultimo_alerta = dialogo.message
+    with contextlib.suppress(Exception):
+        dialogo.dismiss()
+
+
+def consumir_alerta(page: Page) -> str:
+    """Lê e zera o último alert registrado nesta página."""
+    mensagem = getattr(page, "_rpa_ultimo_alerta", "") or ""
+    page._rpa_ultimo_alerta = ""
+    return mensagem
+
 def registrar_tela_cheia_em_novas_paginas(context: BrowserContext, config: Config) -> None:
     """Configura handlers de novas páginas para bloquear interação e maximizar automaticamente."""
     def _ao_abrir_pagina(nova_pagina: Page) -> None:
+        nova_pagina.on("dialog", _registrar_alerta)
         with contextlib.suppress(Exception):
             nova_pagina.wait_for_load_state("domcontentloaded")
         with contextlib.suppress(Exception):
