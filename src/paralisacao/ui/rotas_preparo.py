@@ -4,10 +4,10 @@ from pathlib import Path
 
 from flask import redirect, request
 
+from paralisacao.entrada import eh_planilha
 from paralisacao.mapeamento import (
     codigo_motivo,
     motivo_sistema,
-    normalizar,
     salvar_codigo_motivo,
     texto_observacao,
 )
@@ -97,7 +97,7 @@ def _gravar_uploads(destino_dir: Path, arquivos, pastas) -> list[Path]:
     salvos: list[Path] = []
     for item in escolhidos:
         nome = Path(getattr(item, "filename", "") or "").name
-        if not nome or nome.startswith("~$") or Path(nome).suffix.lower() not in {".xlsx", ".xlsm"}:
+        if not eh_planilha(nome):
             continue
         destino = destino_dir / nome
         item.save(destino)
@@ -128,15 +128,16 @@ def _html_resumo(resumo_lido, linhas, config) -> str:
     for linha in linhas:
         nome = motivo_sistema(linha.motivo, config)
         codigo = codigo_motivo(nome, config) if nome else None
-        if codigo and normalizar(linha.motivo) != normalizar(nome):
-            aberto = (
-                f"{codigo} · {html.escape(nome)}"
-                f"<br><span class=\"mutedx\">Observação: {html.escape(texto_observacao(linha.motivo, nome))}</span>"
-            )
-        elif codigo:
-            aberto = f"{codigo} · {html.escape(nome)}"
-        else:
+        if not codigo:
             aberto = "código pendente"
+        else:
+            aberto = f"{codigo} · {html.escape(nome)}"
+            observacao = texto_observacao(linha.motivo, nome)
+            if observacao != linha.motivo:
+                aberto += (
+                    "<br><span class=\"mutedx\">"
+                    f"Observação: {html.escape(observacao)}</span>"
+                )
         partes.append(
             "<tr>"
             f"<td>{html.escape(linha.registro)}</td>"

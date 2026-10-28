@@ -158,6 +158,11 @@ def _registrar_alerta(dialogo) -> None:
         dialogo.dismiss()
 
 
+def limpar_alerta(page: Page) -> None:
+    """Descarta um alert anterior antes de uma nova gravação."""
+    page._rpa_ultimo_alerta = ""
+
+
 def consumir_alerta(page: Page) -> str:
     """Lê e zera o último alert registrado nesta página."""
     mensagem = getattr(page, "_rpa_ultimo_alerta", "") or ""

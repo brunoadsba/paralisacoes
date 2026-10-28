@@ -48,6 +48,13 @@ def _abrir_ou_criar_capa(page, config: Config, c, prog_navio: str) -> int | None
     navegacao.abrir_tela_7001(page, config)
     return capa.buscar_capa(page, config, c, prog_navio)
 
+
+def _ir_para_proxima(page, config: Config, indice: int, total: int) -> None:
+    from paralisacao import navegacao
+
+    if indice < total - 1:
+        navegacao.voltar_para_lista(page, config)
+
 def executar(dados: DadosPlanilha, config: Config, relatorio: Relatorio, status_file: Path, planilha_path: str = "") -> None:
     """Orquestra a execução completa do RPA pelo Playwright."""
     from playwright.sync_api import sync_playwright
@@ -124,8 +131,7 @@ def executar(dados: DadosPlanilha, config: Config, relatorio: Relatorio, status_
                     logger.error("   !! Grade de paralisações ilegível. Capa pulada para não duplicar lançamentos.")
                     relatorio.add_capa_erro(c.registro, "grade de paralisações ilegível")
                     browser.salvar_screenshot(page, config, f"grade_ilegivel_capa{c.registro}")
-                    if i < len(dados.capas) - 1:
-                        navegacao.voltar_para_lista(page, config)
+                    _ir_para_proxima(page, config, i, len(dados.capas))
                     continue
                 logger.info(f"   Grid contem {len(grid)-1} paralisacao(oes) ja registrada(s).")
 
@@ -140,7 +146,7 @@ def executar(dados: DadosPlanilha, config: Config, relatorio: Relatorio, status_
                         relatorio.add_paralisacao_ok(c.registro, p)
                         continue
 
-                    inicio = popup._calcular_data_hora(c.data, c.periodo, p.inicio)
+                    inicio = popup.calcular_data_hora(c.data, c.periodo, p.inicio)
                     existente = status.paralisacao_ja_existe(grid, inicio)
                     if existente:
                         logger.info(f"   - {p.inicio}->{p.fim} {p.motivo}: ja existe no OpenPort ({existente})")
@@ -176,9 +182,7 @@ def executar(dados: DadosPlanilha, config: Config, relatorio: Relatorio, status_
                 status._atualizar_status_capa(sc)
                 status.salvar_status(status_dict, status_file)
 
-                # Voltar para lista apenas se houver mais capas
-                if i < len(dados.capas) - 1:
-                    navegacao.voltar_para_lista(page, config)
+                _ir_para_proxima(page, config, i, len(dados.capas))
 
             logger.info("\nProcessamento concluido.")
 

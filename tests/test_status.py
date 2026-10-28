@@ -2,7 +2,6 @@ import json
 
 import pytest
 
-from paralisacao.config import Config
 from paralisacao.planilha import Paralisacao
 from paralisacao.status import (
     _atualizar_status_capa,
@@ -17,10 +16,6 @@ from paralisacao.status import (
 @pytest.fixture
 def status_file(tmp_path):
     return tmp_path / "status.json"
-
-@pytest.fixture
-def config():
-    return Config.from_env()
 
 class TestCarregarStatus:
     def test_arquivo_inexistente(self, status_file):

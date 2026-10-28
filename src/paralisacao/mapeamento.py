@@ -8,6 +8,7 @@ from paralisacao.config import Config
 logger = logging.getLogger("paralisacao.mapeamento")
 
 _CODIGOS_MOTIVO_CACHE: dict[str, int] | None = None
+_MOTIVOS_JSON: tuple[str, int, dict[str, str], dict[str, int]] | None = None
 
 def normalizar(texto: str) -> str:
     """Normaliza texto removendo acentuação, espaços extras e convertendo para maiúsculo."""
@@ -22,27 +23,45 @@ def turno_do_periodo(periodo: str, config: Config) -> dict | None:
     inicio = periodo.split("/")[0].strip()
     return config.turnos.get(inicio)
 
+def _motivos_json(config: Config) -> tuple[dict[str, str], dict[str, int]]:
+    """Lê motivos.json uma vez por alteração do arquivo."""
+    global _MOTIVOS_JSON
+    arquivo = config.project_root / "data" / "motivos.json"
+    try:
+        modificado = arquivo.stat().st_mtime_ns
+    except OSError:
+        return {}, {}
+    caminho = str(arquivo)
+    if _MOTIVOS_JSON and _MOTIVOS_JSON[0] == caminho and _MOTIVOS_JSON[1] == modificado:
+        return _MOTIVOS_JSON[2], _MOTIVOS_JSON[3]
+    try:
+        dados = json.loads(arquivo.read_text(encoding="utf-8"))
+    except Exception as e:
+        logger.error(f"Erro ao ler motivos.json: {e}")
+        return {}, {}
+    mapeamentos = {
+        normalizar(chave): valor
+        for chave, valor in dados.get("mapeamentos", {}).items()
+    }
+    codigos: dict[str, int] = {}
+    for nome, codigo in dados.get("codigos", {}).items():
+        try:
+            codigos[normalizar(nome)] = int(codigo)
+        except (TypeError, ValueError):
+            continue
+    _MOTIVOS_JSON = (caminho, modificado, mapeamentos, codigos)
+    return mapeamentos, codigos
+
+
 def motivo_sistema(motivo: str, config: Config) -> str | None:
     """Retorna o nome do motivo no OpenPort correspondente ao motivo da planilha."""
     if not motivo:
         return None
-
-    # Tenta carregar do arquivo externo motivos.json
-    arquivo_motivos = config.project_root / "data" / "motivos.json"
-    if arquivo_motivos.exists():
-        try:
-            dados_motivos = json.loads(arquivo_motivos.read_text(encoding="utf-8"))
-            mapeamentos = {
-                normalizar(chave): valor
-                for chave, valor in dados_motivos.get("mapeamentos", {}).items()
-            }
-            normalized_motivo = normalizar(motivo)
-            if normalized_motivo in mapeamentos:
-                return mapeamentos[normalized_motivo]
-        except Exception as e:
-            logger.error(f"Erro ao ler motivos.json: {e}")
-
-    return config.motivo_correspondencia.get(normalizar(motivo))
+    mapeamentos, _codigos = _motivos_json(config)
+    chave = normalizar(motivo)
+    if chave in mapeamentos:
+        return mapeamentos[chave]
+    return config.motivo_correspondencia.get(chave)
 
 def _carregar_codigos_motivo(config: Config) -> dict[str, int]:
     """Carrega {descricao_upper: codigo} do arquivo tipo-paralizacoes.md."""
@@ -62,33 +81,15 @@ def _carregar_codigos_motivo(config: Config) -> dict[str, int]:
         logger.error(f"Erro ao carregar codigos de motivo: {e}")
     return codigos
 
-def _codigos_json(config: Config) -> dict[str, int]:
-    arquivo = config.project_root / "data" / "motivos.json"
-    if not arquivo.exists():
-        return {}
-    try:
-        dados = json.loads(arquivo.read_text(encoding="utf-8"))
-    except Exception as e:
-        logger.error(f"Erro ao ler codigos de motivos.json: {e}")
-        return {}
-    codigos = {}
-    for nome, codigo in dados.get("codigos", {}).items():
-        try:
-            codigos[normalizar(nome)] = int(codigo)
-        except (TypeError, ValueError):
-            continue
-    return codigos
-
-
 def codigo_motivo(nome_sistema: str, config: Config) -> int | None:
     """Retorna o codigo numerico do motivo a partir do nome no sistema."""
     global _CODIGOS_MOTIVO_CACHE
     if _CODIGOS_MOTIVO_CACHE is None:
         _CODIGOS_MOTIVO_CACHE = _carregar_codigos_motivo(config)
     chave = normalizar(nome_sistema)
-    extra = _codigos_json(config)
-    if chave in extra:
-        return extra[chave]
+    _mapeamentos, codigos = _motivos_json(config)
+    if chave in codigos:
+        return codigos[chave]
     return _CODIGOS_MOTIVO_CACHE.get(chave)
 
 
@@ -110,4 +111,6 @@ def salvar_codigo_motivo(config: Config, motivo_planilha: str, codigo: int) -> N
     chave = normalizar(motivo_planilha)
     dados["mapeamentos"][chave] = chave
     dados["codigos"][chave] = int(codigo)
+    global _MOTIVOS_JSON
     arquivo.write_text(json.dumps(dados, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    _MOTIVOS_JSON = None

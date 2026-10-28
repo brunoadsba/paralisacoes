@@ -21,24 +21,31 @@ def _aguardar_recarga(page: Page) -> None:
     browser.esperar(page, 1500)
 
 
+_CONTEXTO_DESTRUIDO = "context was destroyed"
+
+
+def _clicar_atualizar(page: Page) -> None:
+    for seletor in ("#REFRESH", "xpath=/html/body/div[3]/div[1]/button[3]"):
+        local = page.locator(seletor)
+        if local.count() == 0:
+            continue
+        local.first.evaluate("el => el.click()")
+        _aguardar_recarga(page)
+        logger.info("     Tela atualizada.")
+        return
+    logger.warning("     (aviso: botão Atualizar não encontrado)")
+
+
 def _atualizar_grade(page: Page) -> None:
     """O OpenPort pode recarregar a tela sozinho ao fechar o popup; o escudo some junto."""
     _aguardar_recarga(page)
     try:
         for tentativa in range(2):
             try:
-                for seletor in ("#REFRESH", "xpath=/html/body/div[3]/div[1]/button[3]"):
-                    local = page.locator(seletor)
-                    if local.count() == 0:
-                        continue
-                    local.first.evaluate("el => el.click()")
-                    _aguardar_recarga(page)
-                    logger.info("     Tela atualizada.")
-                    return
-                logger.warning("     (aviso: botão Atualizar não encontrado)")
+                _clicar_atualizar(page)
                 return
             except Exception as exc:
-                if "context was destroyed" not in str(exc) or tentativa == 1:
+                if _CONTEXTO_DESTRUIDO not in str(exc) or tentativa == 1:
                     logger.warning(f"     (aviso: atualizar: {exc})")
                     return
                 _aguardar_recarga(page)
@@ -152,7 +159,7 @@ def selecionar_estadia(popup: Page, nome_navio: str, config: Config) -> bool:
         logger.error(f"     !! Erro ao selecionar estadia: {e}")
         return False
 
-def _calcular_data_hora(capa_data: str, periodo: str, hora_str: str) -> str:
+def calcular_data_hora(capa_data: str, periodo: str, hora_str: str) -> str:
     """Retorna 'DD/MM/YYYY HH:MM' ajustando a data se o horário passou da meia-noite."""
     if not hora_str:
         return capa_data
@@ -275,12 +282,12 @@ def adicionar_paralisacao(page: Page, config: Config, relatorio: Relatorio,
             selecionar_estadia(popup, nome_navio, config)
 
         # 4. Inicio (data + hora ajustada por turno noturno)
-        valor_inicio = _calcular_data_hora(capa_data, capa_periodo, p.inicio)
+        valor_inicio = calcular_data_hora(capa_data, capa_periodo, p.inicio)
         preencher_data_hora(popup, config, config.css["popup_data_inicio"],
                              config.css["popup_hora_inicio"], valor_inicio)
 
         # 5. Fim
-        valor_fim = _calcular_data_hora(capa_data, capa_periodo, p.fim)
+        valor_fim = calcular_data_hora(capa_data, capa_periodo, p.fim)
         preencher_data_hora(popup, config, config.css["popup_data_fim"],
                              config.css["popup_hora_fim"], valor_fim)
 
@@ -295,7 +302,7 @@ def adicionar_paralisacao(page: Page, config: Config, relatorio: Relatorio,
 
         # 7. Gravar
         logger.info("     Gravando paralisacao...")
-        popup._rpa_ultimo_alerta = ""
+        browser.limpar_alerta(popup)
         browser.acionar(popup, config, config.css["popup_btn_gravar"])
         with contextlib.suppress(Exception):
             popup.wait_for_load_state("networkidle", timeout=8000)

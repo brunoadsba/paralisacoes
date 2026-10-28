@@ -4,6 +4,12 @@ from pathlib import Path
 _EXTENSOES = {".xlsx", ".xlsm"}
 
 
+def eh_planilha(nome: str) -> bool:
+    """Arquivo .xlsx ou .xlsm que não é o temporário do Excel."""
+    arquivo = Path(nome)
+    return bool(arquivo.name) and not arquivo.name.startswith("~$") and arquivo.suffix.lower() in _EXTENSOES
+
+
 def deve_abrir_painel(comando: str | None, planilha: str | None, dry_run: bool) -> bool:
     """Duplo clique e `python -m paralisacao` sem arquivo abrem o painel."""
     return comando is None and not (planilha or "").strip() and not dry_run
@@ -38,9 +44,7 @@ def _unico_xlsx(pasta: Path) -> Path:
     arquivos = sorted(
         item
         for item in pasta.iterdir()
-        if item.is_file()
-        and item.suffix.lower() in _EXTENSOES
-        and not item.name.startswith("~$")
+        if item.is_file() and eh_planilha(item.name)
     )
     if not arquivos:
         raise ValueError(f"Nenhuma planilha .xlsx em {pasta}")

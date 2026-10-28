@@ -35,18 +35,18 @@ def buscar_capa(page: Page, config: Config, capa: Capa, prog_navio: str) -> int 
 
     grid = page.locator(config.css["grid_resultados"])
     rows = grid.locator("tr")
-    linha = None
-    for indice in range(1, rows.count()):
-        celulas = [texto.strip() for texto in rows.nth(indice).locator("td").all_inner_texts()]
-        if capa.data in celulas:
-            linha = rows.nth(indice)
-            break
-    if linha is None:
-        logger.info(f"   Capa {capa.registro} nao encontrada em {capa.data}. Registros na grade: {rows.count() - 1}")
+    total = rows.count()
+    textos = grid.evaluate(
+        """el => [...el.querySelectorAll('tr')].map(tr =>
+            [...tr.querySelectorAll('td')].map(td => td.innerText.trim()))"""
+    ) if total > 1 else []
+    indice = next((i for i, celulas in enumerate(textos) if i and capa.data in celulas), None)
+    if indice is None:
+        logger.info(f"   Capa {capa.registro} nao encontrada em {capa.data}. Registros na grade: {total - 1}")
         return None
 
     logger.info("   Capa encontrada. Clicando no resultado.")
-    linha.locator("td").first.evaluate(
+    rows.nth(indice).locator("td").first.evaluate(
         """el => {
             const alvo = el.querySelector('a, input, button') || el;
             alvo.click();
