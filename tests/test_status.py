@@ -5,6 +5,7 @@ import pytest
 from paralisacao.planilha import Paralisacao
 from paralisacao.status import (
     _atualizar_status_capa,
+    _marcar_erro_no_status,
     _marcar_ok_no_status,
     _paralisacao_ok_no_status,
     carregar_status,
@@ -61,6 +62,25 @@ class TestStatusCapaLogic:
         }
         _atualizar_status_capa(sc)
         assert sc["status"] == "parcial"
+
+    def test_falha_deixa_capa_parcial(self):
+        sc = {"codRegistro": 123, "paralisacoes": []}
+        _marcar_ok_no_status(sc, Paralisacao(inicio="13:00", fim="13:15", motivo="DDS"), 434)
+        _marcar_erro_no_status(sc, Paralisacao(inicio="14:00", fim="14:15", motivo="CHUVA"), 5)
+        _atualizar_status_capa(sc)
+        assert sc["status"] == "parcial"
+        assert sc["paralisacoes"][1]["status"] == "erro"
+
+    def test_sucesso_substitui_a_falha_da_mesma_hora(self):
+        sc = {"paralisacoes": []}
+        paralisacao = Paralisacao(inicio="14:00", fim="14:15", motivo="CHUVA")
+        _marcar_erro_no_status(sc, paralisacao, 0)
+        _marcar_ok_no_status(sc, paralisacao, 5)
+        _atualizar_status_capa(sc)
+        assert len(sc["paralisacoes"]) == 1
+        assert sc["paralisacoes"][0]["status"] == "ok"
+        assert sc["paralisacoes"][0]["codigo"] == 5
+        assert sc["status"] == "completa"
 
 class TestParalisacaoJaExiste:
     def test_paralisacao_existe_na_grid(self):

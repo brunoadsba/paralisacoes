@@ -60,8 +60,9 @@ def _marcar_ok_no_status(status_capa: dict, p, codigo: int) -> None:
     """Marca uma paralisação como sucesso no status da capa."""
     hi = _normalizar_horario(p.inicio)
     for para in status_capa["paralisacoes"]:
-        if para.get("codigo") == codigo and para.get("inicio") == hi:
+        if para.get("inicio") == hi:
             para["status"] = "ok"
+            para["codigo"] = codigo
             return
     status_capa["paralisacoes"].append({
         "inicio": hi,
@@ -69,6 +70,22 @@ def _marcar_ok_no_status(status_capa: dict, p, codigo: int) -> None:
         "motivo_planilha": p.motivo,
         "codigo": codigo,
         "status": "ok"
+    })
+
+def _marcar_erro_no_status(status_capa: dict, p, codigo: int) -> None:
+    """Registra a paralisação que não gravou, para a capa não parecer completa."""
+    hi = _normalizar_horario(p.inicio)
+    for para in status_capa["paralisacoes"]:
+        if para.get("inicio") == hi:
+            para["status"] = "erro"
+            para["codigo"] = codigo
+            return
+    status_capa["paralisacoes"].append({
+        "inicio": hi,
+        "fim": _normalizar_horario(p.fim),
+        "motivo_planilha": p.motivo,
+        "codigo": codigo,
+        "status": "erro"
     })
 
 def _atualizar_status_capa(sc: dict) -> None:

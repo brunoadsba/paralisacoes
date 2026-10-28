@@ -40,6 +40,12 @@ class Relatorio:
         self.paralisacoes_erro.append(f"Capa {capa} | {p.inicio} -> {p.fim} | {p.motivo} | {erro}")
         self.erros_detalhe.append(f"Capa {capa} - {p.inicio}->{p.fim} ({p.motivo}): {erro}")
 
+    def codigo_de_saida(self, falha_fatal: bool = False) -> int:
+        """0 quando nada ficou para trás. Motivo sem código não conta como falha."""
+        if falha_fatal or self.capas_erro or self.paralisacoes_erro or self.capas_nao_encontradas:
+            return 1
+        return 0
+
     def gerar_arquivo(self, planilha_path: str = ""):
         fim = datetime.now()
         duracao = (fim - self.inicio).total_seconds()

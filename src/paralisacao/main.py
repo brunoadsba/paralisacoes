@@ -55,7 +55,7 @@ def _ir_para_proxima(page, config: Config, indice: int, total: int) -> None:
     if indice < total - 1:
         navegacao.voltar_para_lista(page, config)
 
-def executar(dados: DadosPlanilha, config: Config, relatorio: Relatorio, status_file: Path, planilha_path: str = "") -> None:
+def executar(dados: DadosPlanilha, config: Config, relatorio: Relatorio, status_file: Path, planilha_path: str = "") -> int:
     """Orquestra a execução completa do RPA pelo Playwright."""
     from playwright.sync_api import sync_playwright
 
@@ -69,6 +69,7 @@ def executar(dados: DadosPlanilha, config: Config, relatorio: Relatorio, status_
         logger.info("Modo primeiro plano: navegador visivel para acompanhamento.")
 
     relatorio.planilha = planilha_path or config.planilha
+    falha_fatal = False
 
     with sync_playwright() as pw:
         browser_instance = pw.chromium.launch(
@@ -158,6 +159,7 @@ def executar(dados: DadosPlanilha, config: Config, relatorio: Relatorio, status_
 
                     # Inserir paralisação
                     try:
+                        erros_antes = len(relatorio.paralisacoes_erro)
                         ok = popup.adicionar_paralisacao(
                             page, config, relatorio,
                             capa_registro=c.registro,
@@ -172,11 +174,17 @@ def executar(dados: DadosPlanilha, config: Config, relatorio: Relatorio, status_
                             if codigo:
                                 status._marcar_ok_no_status(sc, p, codigo)
                                 status.salvar_status(status_dict, status_file)
+                        elif len(relatorio.paralisacoes_erro) > erros_antes:
+                            logger.warning("   FALHOU")
+                            status._marcar_erro_no_status(sc, p, codigo or 0)
+                            status.salvar_status(status_dict, status_file)
                         else:
                             logger.warning("   FALHOU")
                     except Exception as e:
                         logger.error(f"!! Erro na paralisacao {p.inicio}->{p.fim}: {e}")
                         relatorio.add_paralisacao_erro(c.registro, p, str(e))
+                        status._marcar_erro_no_status(sc, p, codigo or 0)
+                        status.salvar_status(status_dict, status_file)
                         browser.salvar_screenshot(page, config, f"erro_capa{c.registro}")
 
                 status._atualizar_status_capa(sc)
@@ -187,6 +195,7 @@ def executar(dados: DadosPlanilha, config: Config, relatorio: Relatorio, status_
             logger.info("\nProcessamento concluido.")
 
         except Exception as e:
+            falha_fatal = True
             logger.exception(f"!! Erro fatal na execucao: {e}")
             browser.salvar_screenshot(page, config, "erro_fatal")
         finally:
@@ -206,6 +215,8 @@ def executar(dados: DadosPlanilha, config: Config, relatorio: Relatorio, status_
 
             context.close()
             browser_instance.close()
+
+    return relatorio.codigo_de_saida(falha_fatal)
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="RPA de Paralisações — OpenPort CODEBA")
@@ -309,8 +320,7 @@ def main() -> int:
 
     relatorio = Relatorio(relatorios_dir, num_rodada)
 
-    executar(dados, config, relatorio, status_file, planilha_path=planilha_alvo)
-    return 0
+    return executar(dados, config, relatorio, status_file, planilha_path=planilha_alvo)
 
 if __name__ == "__main__":
     sys.exit(main())
